@@ -133,17 +133,14 @@ const SearchModule: React.FC<Props> = ({
 
   const handleSearch = () => {
     const filtered = db.filter(item => {
-      // Filtro por falta de sumário
       if (showMissingSummary) {
           const noSum = !item.sumario || item.sumario.length < 50 || item.sumario.includes('Sumário não identificado');
           if (!noSum) return false;
       }
-      // Filtro por falta de metadados
       if (showMissingData) {
           const missData = item.relator === 'Desconhecido' || item.data === 'N/D';
           if (!missData) return false;
       }
-
       if (filters.processo && !fuzzyMatch(item.processo, filters.processo)) return false;
       if (filters.relator && !fuzzyMatch(item.relator, filters.relator)) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyMatch(a, filters.adjunto))) return false;
@@ -160,9 +157,10 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const handleBatchAI = async (type: 'sumario' | 'missing') => {
-      // 1. Verificação prévia da chave para evitar loop de alerts
-      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
-          alert("A chave de acesso não foi detetada. Por favor, clique no botão 'Chave Ativa' no topo e selecione uma chave válida antes de iniciar.");
+      // Verificação única e inicial da chave
+      const apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === 'undefined') {
+          alert("A chave de acesso não foi configurada. Por favor, utilize o botão 'Chave Ativa' no topo e selecione uma chave no diálogo do sistema.");
           return;
       }
 
@@ -193,8 +191,7 @@ const SearchModule: React.FC<Props> = ({
               const aiResult = await extractMetadataWithAI(context);
               
               if (!aiResult) {
-                  // Se o resultado for nulo, algo falhou no serviço (ex: chave inválida)
-                  // Interrompemos o lote para não acumular erros
+                  // Se o serviço falhar (ex: erro de chave capturado internamente), paramos o lote
                   setIsBatchRunning(false);
                   return;
               }
@@ -215,10 +212,9 @@ const SearchModule: React.FC<Props> = ({
                   processedItems: [`Concluído: ${item.processo}`, ...prev.processedItems].slice(0, 5)
               }));
           } catch (e: any) { 
-              console.error("Batch Item Error:", e);
-              // Se for erro de chave, para tudo
-              if (e.message?.includes("API_KEY") || e.message?.includes("Chave")) {
-                  alert("Processamento interrompido: " + e.message);
+              // Se for um erro de autenticação, para o loop imediatamente
+              if (e.message?.includes("CHAVE")) {
+                  alert("Erro de Chave de API: O processamento foi interrompido.");
                   setIsBatchRunning(false);
                   return;
               }
@@ -234,7 +230,8 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
-      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey || apiKey === 'undefined') {
           alert("Por favor, configure a chave de acesso no topo.");
           return;
       }
@@ -257,7 +254,8 @@ const SearchModule: React.FC<Props> = ({
           }
           onUpdateAcordao(updated);
       } catch (e: any) {
-          alert("Erro no processamento: " + e.message);
+          if (e.message?.includes("CHAVE")) alert("Erro de Chave API detetado.");
+          else console.error(e);
       } finally {
           setIsProcessingSingle(null);
       }

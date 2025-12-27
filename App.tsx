@@ -4,7 +4,8 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2, RotateCcw } from 'lucide-react';
+// Added 'Info' to the imports to fix the error on line 201
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2, RotateCcw, AlertTriangle, Info } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -23,12 +24,12 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
-  const [hasUserKey, setHasUserKey] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
   const [keyActionTriggered, setKeyActionTriggered] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Efeito para verificar se a chave já está configurada
   useEffect(() => {
     const checkKey = async () => {
       // @ts-ignore
@@ -36,7 +37,6 @@ function App() {
         try {
           // @ts-ignore
           const selected = await window.aistudio.hasSelectedApiKey();
-          setHasUserKey(selected);
           if (selected) setOnboardingStep('area');
         } catch (e) {}
       }
@@ -48,6 +48,7 @@ function App() {
     // @ts-ignore
     if (window.aistudio?.openSelectKey) {
       try {
+        // Abre o diálogo do sistema (o campo de inserção aparece numa popup do browser/sistema)
         // @ts-ignore
         await window.aistudio.openSelectKey();
         setKeyActionTriggered(true);
@@ -60,7 +61,6 @@ function App() {
   };
 
   const handleProceedToApp = () => {
-    setHasUserKey(true);
     setOnboardingStep('area');
   };
 
@@ -69,7 +69,6 @@ function App() {
     if (window.aistudio?.openSelectKey) {
       // @ts-ignore
       await window.aistudio.openSelectKey();
-      setHasUserKey(true);
     }
   };
 
@@ -186,37 +185,43 @@ function App() {
               </div>
               <h2 className="text-3xl font-black mb-3 tracking-tighter text-legal-900">JurisAnalítica</h2>
               <p className="text-gray-500 mb-8 font-medium">
-                Para iniciar a análise local dos acórdãos, configure primeiro a sua chave de acesso.
+                Para iniciar a análise local, deve configurar primeiro a sua chave Gemini API.
               </p>
               
-              <div className="space-y-3">
-                <button 
-                  onClick={handleOpenKeySelector} 
-                  className={`w-full p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 ${keyActionTriggered ? 'bg-green-50 text-green-700 border-2 border-green-200 shadow-none' : 'bg-legal-900 text-white hover:bg-black'}`}
-                >
-                  {keyActionTriggered ? <CheckCircle2 className="w-5 h-5" /> : <Key className="w-5 h-5 text-legal-200" />}
-                  {keyActionTriggered ? 'Chave Configurada' : '1. Abrir Seletor de Chave'}
-                </button>
+              <div className="space-y-4">
+                <div className={`p-6 rounded-3xl border-2 transition-all ${keyActionTriggered ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
+                    <button 
+                      onClick={handleOpenKeySelector} 
+                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all ${keyActionTriggered ? 'bg-green-600 text-white shadow-lg' : 'bg-legal-900 text-white hover:bg-black shadow-xl active:scale-95'}`}
+                    >
+                      {keyActionTriggered ? <CheckCircle2 className="w-5 h-5" /> : <Key className="w-5 h-5 text-legal-200" />}
+                      {keyActionTriggered ? 'Passo 1 Concluído' : '1. Abrir Janela da Chave'}
+                    </button>
+                    {!keyActionTriggered && (
+                        <p className="text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-widest leading-tight">
+                           <Info className="w-3 h-3 inline mr-1 mb-0.5"/> Procure a janela do sistema que irá pedir para colar a sua chave.
+                        </p>
+                    )}
+                </div>
 
                 {keyActionTriggered && (
                   <button 
                     onClick={handleProceedToApp} 
                     className="w-full bg-legal-900 text-white p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-95 animate-in slide-in-from-top-2"
                   >
-                    2. Entrar na Aplicação
+                    2. Continuar para Áreas
                     <ArrowRight className="w-5 h-5" />
                   </button>
                 )}
               </div>
 
-              {!keyActionTriggered ? (
-                <p className="text-[10px] text-gray-400 mt-6 font-bold uppercase tracking-widest leading-relaxed">
-                  Nota: Ao clicar, cole a sua chave na janela do sistema que irá aparecer.
-                </p>
-              ) : (
-                <p className="text-[10px] text-green-600 mt-6 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
-                  <ShieldCheck className="w-3 h-3"/> Pronto para processar acórdãos localmente.
-                </p>
+              {!keyActionTriggered && (
+                <div className="mt-8 flex items-start gap-3 text-left bg-orange-50 p-4 rounded-2xl border border-orange-100">
+                    <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0" />
+                    <p className="text-[10px] text-orange-800 font-bold uppercase tracking-tight leading-normal">
+                        Nota: Se não aparecer nenhuma janela após o clique, verifique se o seu browser está a bloquear popups ou se já existe uma chave guardada.
+                    </p>
+                </div>
               )}
             </div>
           ) : (
@@ -246,9 +251,6 @@ function App() {
                   </button>
                 ))}
               </div>
-              {db.length > 0 && (
-                <p className="mt-6 text-[10px] font-bold text-orange-600 uppercase tracking-widest">Aviso: Tem {db.length} acórdãos carregados na memória.</p>
-              )}
             </div>
           )}
         </div>
