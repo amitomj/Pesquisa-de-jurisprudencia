@@ -33,8 +33,10 @@ function App() {
   useEffect(() => {
     const checkExistingKey = async () => {
       if (window.aistudio?.hasSelectedApiKey) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        if (hasKey) setOnboardingStep('area');
+        try {
+          const hasKey = await window.aistudio.hasSelectedApiKey();
+          if (hasKey) setOnboardingStep('area');
+        } catch (e) {}
       }
     };
     checkExistingKey();
@@ -42,12 +44,12 @@ function App() {
 
   const handleStartSetup = async () => {
     if (window.aistudio?.openSelectKey) {
-      // Abre o diálogo do sistema (janela nativa da plataforma)
+      // Abre o diálogo do sistema (janela nativa da plataforma onde o utilizador cola a chave)
       await window.aistudio.openSelectKey();
-      // Regra: Assumir sucesso imediatamente para permitir o avanço
+      // Assume sucesso para avançar o ecrã
       setOnboardingStep('area');
     } else {
-      // Caso não esteja no ambiente de produção do AI Studio
+      // Fallback para ambientes sem aistudio SDK
       setOnboardingStep('area');
     }
   };
@@ -179,11 +181,16 @@ function App() {
                 <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2 px-1">
                   CHAVE API (GOOGLE GEMINI)
                 </label>
-                <div className="relative">
-                  <div className="w-full bg-[#334155]/50 border border-slate-600 rounded-lg p-3.5 text-slate-400 text-sm italic shadow-inner select-none cursor-not-allowed">
-                    Ex: AlzaSy...
-                  </div>
-                </div>
+                <button 
+                  onClick={handleStartSetup}
+                  className="w-full bg-[#334155]/50 border border-slate-600 rounded-lg p-3.5 text-slate-400 text-sm text-left italic shadow-inner hover:bg-[#334155]/80 transition-all cursor-pointer flex items-center justify-between group"
+                >
+                  <span>Ex: AlzaSy...</span>
+                  <Key className="w-4 h-4 text-slate-600 group-hover:text-blue-500 transition-colors" />
+                </button>
+                <p className="text-[10px] text-slate-500 mt-2 px-1">
+                  * Clique acima para inserir a chave na janela segura do sistema.
+                </p>
               </div>
 
               <button 
@@ -208,10 +215,9 @@ function App() {
                 </p>
               </div>
               
-              {/* Botão discreto para importar backup se já tiver dados */}
               <div className="mt-8">
                 <button onClick={() => fileInputRef.current?.click()} className="text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-all">
-                  Ou Importar Backup Anterior
+                  OU IMPORTAR BACKUP ANTERIOR
                 </button>
               </div>
             </div>
