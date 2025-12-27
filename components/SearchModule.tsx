@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Acordao, SearchFilters, SearchResult } from '../types';
-import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp } from 'lucide-react';
+import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const parseDate = (dateStr: string): number => {
@@ -114,8 +114,8 @@ const SearchModule: React.FC<Props> = ({
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [summaryView, setSummaryView] = useState<Acordao | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, type: string, fileName: string, processedItems: string[]}>({
-    current: 0, total: 0, type: '', fileName: '', processedItems: []
+  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, type: string, fileName: string, processedItems: string[], errorCount: number}>({
+    current: 0, total: 0, type: '', fileName: '', processedItems: [], errorCount: 0
   });
   const [isBatchRunning, setIsBatchRunning] = useState(false);
   const [isProcessingSingle, setIsProcessingSingle] = useState<string | null>(null);
@@ -133,7 +133,6 @@ const SearchModule: React.FC<Props> = ({
 
   const handleSearch = () => {
     const filtered = db.filter(item => {
-      // Filtros rápidos de itens em falta
       if (showMissingSummary) {
           const noSum = !item.sumario || item.sumario.length < 50 || item.sumario.includes('Sumário não identificado');
           if (!noSum) return false;
@@ -142,7 +141,6 @@ const SearchModule: React.FC<Props> = ({
           const missData = item.relator === 'Desconhecido' || item.data === 'N/D';
           if (!missData) return false;
       }
-
       if (filters.processo && !fuzzyMatch(item.processo, filters.processo)) return false;
       if (filters.relator && !fuzzyMatch(item.relator, filters.relator)) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyMatch(a, filters.adjunto))) return false;
@@ -163,8 +161,8 @@ const SearchModule: React.FC<Props> = ({
           ? results.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('Sumário não identificado'))
           : results.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D' || i.adjuntos.length === 0);
 
-      if (targetList.length === 0) return alert("Nenhum processo na visualização atual necessita desta correção.");
-      if (!confirm(`Confirmar o processamento de ${targetList.length} processos filtrados?`)) return;
+      if (targetList.length === 0) return alert("Nenhum processo filtrado necessita desta correção.");
+      if (!confirm(`Confirmar o processamento de ${targetList.length} processos?`)) return;
 
       setIsBatchRunning(true);
       setBatchProgress({ 
@@ -172,7 +170,8 @@ const SearchModule: React.FC<Props> = ({
           total: targetList.length, 
           type: type === 'sumario' ? 'Sumários' : 'Dados em falta',
           fileName: '',
-          processedItems: []
+          processedItems: [],
+          errorCount: 0
       });
       
       for (let i = 0; i < targetList.length; i++) {
@@ -181,8 +180,15 @@ const SearchModule: React.FC<Props> = ({
           try {
               const textLen = item.textoCompleto.length;
               const context = textLen < 6000 ? item.textoCompleto : item.textoCompleto.substring(0, 3000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 3000);
+              
               const aiResult = await extractMetadataWithAI(context);
               
+              if (!aiResult) {
+                  // Interrompe o lote se for erro de chave
+                  setIsBatchRunning(false);
+                  return;
+              }
+
               const updated = { ...item };
               if (type === 'missing') {
                   if (aiResult.data && aiResult.data !== 'N/D') updated.data = aiResult.data;
@@ -199,15 +205,14 @@ const SearchModule: React.FC<Props> = ({
                   processedItems: [`Concluído: ${item.processo}`, ...prev.processedItems].slice(0, 5)
               }));
           } catch (e) { 
-              console.error(e); 
               setBatchProgress(prev => ({ 
                 ...prev, 
+                errorCount: prev.errorCount + 1,
                 processedItems: [`ERRO: ${item.processo}`, ...prev.processedItems].slice(0, 5)
               }));
           }
       }
       setIsBatchRunning(false);
-      setTimeout(() => setBatchProgress(prev => ({...prev, total: 0})), 3000);
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
@@ -216,8 +221,9 @@ const SearchModule: React.FC<Props> = ({
           const textLen = item.textoCompleto.length;
           const context = textLen < 6000 ? item.textoCompleto : item.textoCompleto.substring(0, 3000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 3000);
           const aiResult = await extractMetadataWithAI(context);
+          if (!aiResult) return;
+
           const updated = { ...item };
-          
           if (mode === 'full' || mode === 'dados') {
               if (aiResult.data) updated.data = aiResult.data;
               if (aiResult.relator) updated.relator = aiResult.relator;
@@ -226,7 +232,6 @@ const SearchModule: React.FC<Props> = ({
           if (mode === 'full' || mode === 'sumario') {
               if (aiResult.sumario) updated.sumario = aiResult.sumario;
           }
-
           onUpdateAcordao(updated);
       } finally {
           setIsProcessingSingle(null);
@@ -260,12 +265,12 @@ const SearchModule: React.FC<Props> = ({
                         </div>
                     ) : (
                         <div className="p-4 bg-green-50 rounded-full">
-                           <Check className="w-10 h-10 text-green-600"/>
+                           {batchProgress.errorCount > 0 ? <OctagonAlert className="w-10 h-10 text-orange-500"/> : <Check className="w-10 h-10 text-green-600"/>}
                         </div>
                     )}
                   </div>
                   
-                  <h3 className="text-xl font-black mb-1 text-legal-900 uppercase tracking-tighter">Processamento Local</h3>
+                  <h3 className="text-xl font-black mb-1 text-legal-900 uppercase tracking-tighter">Processamento em Lote</h3>
                   <p className="text-[10px] text-gray-400 mb-6 font-black uppercase tracking-[0.2em]">Tarefa: {batchProgress.type}</p>
                   
                   <div className="w-full bg-gray-100 rounded-full h-4 mb-3 overflow-hidden border border-gray-200 shadow-inner">
@@ -279,7 +284,7 @@ const SearchModule: React.FC<Props> = ({
 
                   <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100 text-left">
                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                        <Info className="w-3 h-3"/> {isBatchRunning ? 'A processar agora:' : 'Resumo de Ações:'}
+                        <Info className="w-3 h-3"/> {isBatchRunning ? 'A processar agora:' : 'Resultado final:'}
                      </p>
                      <div className="text-[11px] font-bold text-gray-700 truncate mb-4 italic">
                         {batchProgress.fileName || 'A aguardar...'}
@@ -295,7 +300,7 @@ const SearchModule: React.FC<Props> = ({
                   </div>
 
                   {!isBatchRunning && (
-                    <button onClick={() => setBatchProgress({current:0, total:0, type:'', fileName:'', processedItems:[]})} className="mt-8 w-full bg-legal-900 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all">Fechar Relatório</button>
+                    <button onClick={() => setBatchProgress({current:0, total:0, type:'', fileName:'', processedItems:[], errorCount: 0})} className="mt-8 w-full bg-legal-900 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all">Fechar Relatório</button>
                   )}
               </div>
           </div>
@@ -312,7 +317,6 @@ const SearchModule: React.FC<Props> = ({
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-            {/* Quick Actions / Filters for Missing Data */}
             <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-2">
                 <div className="flex items-center gap-2 mb-3 text-legal-900">
                     <CircleHelp className="w-3.5 h-3.5" />
@@ -385,9 +389,6 @@ const SearchModule: React.FC<Props> = ({
                         <span>DADOS IA</span>
                         <Zap className="w-3.5 h-3.5"/>
                     </button>
-                    {(!showMissingSummary && !showMissingData) && (
-                        <p className="text-[8px] text-gray-400 text-center italic mt-1 font-bold">Ative um dos filtros acima para permitir a correção em lote.</p>
-                    )}
                 </div>
             </div>
           </div>
@@ -395,16 +396,6 @@ const SearchModule: React.FC<Props> = ({
           <div className="p-4 border-t bg-gray-50 space-y-2">
             <button onClick={handleSearch} className="w-full bg-legal-900 text-white py-3 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95">
               <Search className="w-4 h-4" /> Aplicar Filtros
-            </button>
-            <button 
-              onClick={() => {
-                setFilters({processo:'', relator:'', adjunto:'', descritor:'', dataInicio:'', dataFim:'', booleanAnd:'', booleanOr:'', booleanNot:''});
-                setShowMissingSummary(false);
-                setShowMissingData(false);
-              }} 
-              className="w-full text-[9px] font-black text-gray-400 hover:text-gray-600 transition-colors uppercase tracking-widest text-center"
-            >
-              Repor Tudo
             </button>
           </div>
         </div>
@@ -417,9 +408,6 @@ const SearchModule: React.FC<Props> = ({
                 <div className="h-full flex flex-col items-center justify-center text-gray-300">
                     <div className="p-8 bg-white rounded-full shadow-inner mb-6 opacity-30"><Search className="w-20 h-20" /></div>
                     <p className="font-black text-sm uppercase tracking-widest">Nenhum acórdão encontrado</p>
-                    {(showMissingSummary || showMissingData) && (
-                        <button onClick={() => {setShowMissingSummary(false); setShowMissingData(false);}} className="mt-4 text-xs font-black text-legal-600 uppercase tracking-widest underline">Remover filtros de qualidade</button>
-                    )}
                 </div>
             ) : (
                 displayedResults.map(item => {
@@ -459,7 +447,6 @@ const SearchModule: React.FC<Props> = ({
                            )}
                         </div>
                       </div>
-                      
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                         <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
                             <span className="font-black text-[9px] text-gray-400 uppercase block mb-1 tracking-widest">Relator Principal</span>
@@ -470,7 +457,6 @@ const SearchModule: React.FC<Props> = ({
                             <span className="text-gray-500 font-bold truncate block">{item.adjuntos.join(', ') || 'N/D'}</span>
                         </div>
                       </div>
-
                       <div className="mt-4 p-5 bg-white border border-gray-100 rounded-2xl group-hover:bg-legal-50 transition-all">
                           <p className={`text-sm leading-[1.6] text-gray-600 italic font-serif ${noSummary ? 'opacity-30' : ''}`}>
                               {noSummary ? 'O sumário jurisdicional ainda não foi gerado para este acórdão.' : item.sumario.substring(0, 320) + (item.sumario.length > 320 ? '...' : '')}
@@ -480,7 +466,6 @@ const SearchModule: React.FC<Props> = ({
                   );
                 })
             )}
-            
             {results.length > ITEMS_PER_PAGE && (
                 <div className="flex justify-center items-center gap-4 py-8">
                     <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="p-3 bg-white border border-gray-200 rounded-2xl shadow-sm disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"><ChevronLeft className="w-5 h-5"/></button>
@@ -491,8 +476,7 @@ const SearchModule: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Modals are unchanged but included for context if necessary */}
-      {/* ... Summary View Modal ... */}
+      {/* Summary View Modal */}
       {summaryView && (
           <div className="fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-400">
@@ -562,7 +546,6 @@ const SearchModule: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Datalists for Autocomplete */}
       <datalist id="judges-list">{availableJudges.map((j, i) => <option key={i} value={j}/>)}</datalist>
       <datalist id="desc-list">{availableDescriptors.map((d, i) => <option key={i} value={d}/>)}</datalist>
     </div>

@@ -2,14 +2,30 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-// Função auxiliar para gerir erros de chave
+// Função interna para garantir que a chave existe antes de criar a instância
+const getAIInstance = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API_KEY_MISSING");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// Função auxiliar para gerir erros de IA
 const handleAIError = async (error: any) => {
   console.error("Gemini Error:", error);
-  if (error.message?.includes("Requested entity was not found")) {
-    alert("A sua API Key parece ser inválida ou expirou. Por favor, selecione-a novamente.");
-    if (window.aistudio) await window.aistudio.openSelectKey();
-    throw new Error("API Key inválida. Por favor, tente novamente após reconfigurar.");
+  
+  if (error.message === "API_KEY_MISSING") {
+    alert("A chave de acesso não foi detetada. Por favor, clique no botão 'Alterar Chave API' no topo.");
+    return null;
   }
+
+  if (error.message?.includes("Requested entity was not found")) {
+    alert("A sua API Key parece ser inválida ou expirou. Por favor, reconfigure a chave no topo.");
+    if (window.aistudio) await window.aistudio.openSelectKey();
+    throw new Error("Chave Inválida");
+  }
+  
   throw error;
 };
 
@@ -17,44 +33,37 @@ export const generateLegalAnswer = async (
   question: string,
   context: Acordao[]
 ): Promise<string> => {
-  // Cria nova instância para garantir uso da chave atualizada no process.env.API_KEY
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-  const relevantContext = context.map(c => 
-    `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 800)}...`
-  ).join('\n---\n');
-
-  const systemPrompt = `
-    És um consultor jurídico sénior em Portugal. Analisa os acórdãos e identifica correntes jurisprudenciais.
-    
-    1. SE HOUVER DIVERGÊNCIA:
-       - Identifica "Posição A" e "Posição B", citando até 5 acórdãos para cada (os mais recentes).
-    2. SE NÃO HOUVER DIVERGÊNCIA:
-       - Responde de forma fundamentada citando os mais relevantes.
-
-    FORMATO DE CITAÇÃO: "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
-  `;
-
   try {
+    const ai = getAIInstance();
+    const relevantContext = context.map(c => 
+      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 800)}...`
+    ).join('\n---\n');
+
+    const systemPrompt = `
+      És um consultor jurídico sénior em Portugal. Analisa os acórdãos e identifica correntes jurisprudenciais.
+      FORMATO DE CITAÇÃO: "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
+    `;
+
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview", // Modelo superior para análise complexa
+      model: "gemini-3-pro-preview",
       contents: `CONTEXTO (${context.length} docs):\n${relevantContext}\n\nQUESTÃO: ${question}`,
       config: {
         systemInstruction: systemPrompt,
         temperature: 0.1,
-        thinkingConfig: { thinkingBudget: 4000 } // Ativa raciocínio detalhado
+        thinkingConfig: { thinkingBudget: 4000 }
       }
     });
 
     return response.text || "Sem resposta.";
   } catch (error) {
-    return handleAIError(error);
+    await handleAIError(error);
+    return "Erro ao gerar resposta. Verifique a sua chave de API.";
   }
 };
 
 export const extractMetadataWithAI = async (textContext: string): Promise<any> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
+    const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Extrai JSON: data (DD-MM-AAAA), relator, adjuntos (array), sumario.\nTEXTO:\n${textContext}`,
@@ -72,12 +81,15 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
       }
     });
     return response.text ? JSON.parse(response.text) : {};
-  } catch (error) { return {}; }
+  } catch (error) { 
+    await handleAIError(error);
+    return null; 
+  }
 };
 
 export const suggestDescriptorsWithAI = async (summary: string, validDescriptors: string[]): Promise<string[]> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   try {
+     const ai = getAIInstance();
      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: `Escolhe descritores.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
@@ -87,5 +99,8 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
         }
      });
      return response.text ? JSON.parse(response.text) : [];
-  } catch (error) { return []; }
+  } catch (error) { 
+    await handleAIError(error);
+    return []; 
+  }
 };
