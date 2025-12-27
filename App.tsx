@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2 } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -25,6 +25,7 @@ function App() {
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   const [hasUserKey, setHasUserKey] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
+  const [keyActionTriggered, setKeyActionTriggered] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,19 +44,32 @@ function App() {
     checkKey();
   }, []);
 
-  const handleEnterWithKey = async () => {
+  const handleOpenKeySelector = async () => {
     // @ts-ignore
     if (window.aistudio?.openSelectKey) {
       try {
         // @ts-ignore
         await window.aistudio.openSelectKey();
-        setHasUserKey(true);
-        setOnboardingStep('area');
+        setKeyActionTriggered(true);
       } catch (e) {
-        setOnboardingStep('area');
+        setKeyActionTriggered(true);
       }
     } else {
-      setOnboardingStep('area');
+      setKeyActionTriggered(true);
+    }
+  };
+
+  const handleProceedToApp = () => {
+    setHasUserKey(true);
+    setOnboardingStep('area');
+  };
+
+  const handleUpdateKeyInApp = async () => {
+    // @ts-ignore
+    if (window.aistudio?.openSelectKey) {
+      // @ts-ignore
+      await window.aistudio.openSelectKey();
+      setHasUserKey(true);
     }
   };
 
@@ -172,20 +186,38 @@ function App() {
               </div>
               <h2 className="text-3xl font-black mb-3 tracking-tighter text-legal-900">JurisAnalítica</h2>
               <p className="text-gray-500 mb-8 font-medium">
-                Para iniciar a análise local dos acórdãos, introduza a sua chave de acesso Gemini.
+                Para iniciar a análise local dos acórdãos, configure primeiro a sua chave de acesso.
               </p>
               
-              <button 
-                onClick={handleEnterWithKey} 
-                className="w-full bg-legal-900 text-white p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-95 mb-4"
-              >
-                <Key className="w-5 h-5 text-legal-200" />
-                Colar Chave e Entrar
-                <ArrowRight className="w-5 h-5" />
-              </button>
-              <p className="text-[10px] text-gray-400 uppercase font-bold tracking-widest flex items-center justify-center gap-2">
-                <ShieldCheck className="w-3 h-3"/> Processamento 100% Local e Seguro
-              </p>
+              <div className="space-y-3">
+                <button 
+                  onClick={handleOpenKeySelector} 
+                  className={`w-full p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all shadow-xl active:scale-95 ${keyActionTriggered ? 'bg-green-50 text-green-700 border-2 border-green-200 shadow-none' : 'bg-legal-900 text-white hover:bg-black'}`}
+                >
+                  {keyActionTriggered ? <CheckCircle2 className="w-5 h-5" /> : <Key className="w-5 h-5 text-legal-200" />}
+                  {keyActionTriggered ? 'Chave Configurada' : '1. Abrir Seletor de Chave'}
+                </button>
+
+                {keyActionTriggered && (
+                  <button 
+                    onClick={handleProceedToApp} 
+                    className="w-full bg-legal-900 text-white p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-95 animate-in slide-in-from-top-2"
+                  >
+                    2. Entrar na Aplicação
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {!keyActionTriggered ? (
+                <p className="text-[10px] text-gray-400 mt-6 font-bold uppercase tracking-widest leading-relaxed">
+                  Nota: Ao clicar, cole a sua chave na janela do sistema que irá aparecer.
+                </p>
+              ) : (
+                <p className="text-[10px] text-green-600 mt-6 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                  <ShieldCheck className="w-3 h-3"/> Pronto para processar acórdãos localmente.
+                </p>
+              )}
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
@@ -236,10 +268,13 @@ function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full">
+            <button 
+              onClick={handleUpdateKeyInApp}
+              className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full hover:bg-green-800/40 transition-all"
+            >
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Motor de IA Pronto</span>
-            </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Alterar Chave API</span>
+            </button>
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
             <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all">Importar</button>
