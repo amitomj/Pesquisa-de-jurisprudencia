@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2 } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2, RotateCcw } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -223,7 +223,7 @@ function App() {
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
               <div className="mb-8 flex justify-center">
                 <div className="p-6 bg-legal-50 rounded-full">
-                  <ScaleIcon className="w-12 h-12 text-legal-700"/>
+                  {legalArea === 'social' ? <Briefcase className="w-12 h-12 text-legal-700"/> : legalArea === 'crime' ? <Gavel className="w-12 h-12 text-legal-700"/> : <ScaleIcon className="w-12 h-12 text-legal-700"/>}
                 </div>
               </div>
               <h2 className="text-3xl font-black mb-2 tracking-tighter text-legal-900">Área de Atuação</h2>
@@ -234,7 +234,7 @@ function App() {
                   <button 
                     key={area} 
                     onClick={() => selectLegalArea(area)} 
-                    className="group p-5 rounded-3xl border-2 border-gray-100 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-5 text-left active:scale-95"
+                    className={`group p-5 rounded-3xl border-2 transition-all flex items-center gap-5 text-left active:scale-95 ${legalArea === area ? 'border-legal-600 bg-legal-50 shadow-md' : 'border-gray-100 hover:border-legal-600 hover:bg-legal-50'}`}
                   >
                     <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all">
                       {area === 'social' ? <Briefcase className="w-7 h-7 text-legal-600"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-legal-600"/> : <ScaleIcon className="w-7 h-7 text-legal-600"/>}
@@ -246,6 +246,9 @@ function App() {
                   </button>
                 ))}
               </div>
+              {db.length > 0 && (
+                <p className="mt-6 text-[10px] font-bold text-orange-600 uppercase tracking-widest">Aviso: Tem {db.length} acórdãos carregados na memória.</p>
+              )}
             </div>
           )}
         </div>
@@ -263,7 +266,12 @@ function App() {
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tighter leading-none">JurisAnalítica</h1>
-              <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black mt-1">Sessão Ativa • {legalArea}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">Sessão Ativa • {legalArea}</p>
+                <button onClick={() => setOnboardingStep('area')} className="text-[9px] bg-legal-700 hover:bg-legal-600 px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 transition-all">
+                   <RotateCcw className="w-2.5 h-2.5" /> Mudar Área
+                </button>
+              </div>
             </div>
           </div>
           
@@ -273,7 +281,7 @@ function App() {
               className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full hover:bg-green-800/40 transition-all"
             >
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Alterar Chave API</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Chave Ativa</span>
             </button>
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
