@@ -133,14 +133,17 @@ const SearchModule: React.FC<Props> = ({
 
   const handleSearch = () => {
     const filtered = db.filter(item => {
+      // Filtro por falta de sumário
       if (showMissingSummary) {
           const noSum = !item.sumario || item.sumario.length < 50 || item.sumario.includes('Sumário não identificado');
           if (!noSum) return false;
       }
+      // Filtro por falta de metadados
       if (showMissingData) {
           const missData = item.relator === 'Desconhecido' || item.data === 'N/D';
           if (!missData) return false;
       }
+
       if (filters.processo && !fuzzyMatch(item.processo, filters.processo)) return false;
       if (filters.relator && !fuzzyMatch(item.relator, filters.relator)) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyMatch(a, filters.adjunto))) return false;
@@ -157,12 +160,18 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const handleBatchAI = async (type: 'sumario' | 'missing') => {
+      // 1. Verificação prévia da chave para evitar loop de alerts
+      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+          alert("A chave de acesso não foi detetada. Por favor, clique no botão 'Chave Ativa' no topo e selecione uma chave válida antes de iniciar.");
+          return;
+      }
+
       const targetList = type === 'sumario' 
           ? results.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('Sumário não identificado'))
           : results.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D' || i.adjuntos.length === 0);
 
       if (targetList.length === 0) return alert("Nenhum processo filtrado necessita desta correção.");
-      if (!confirm(`Confirmar o processamento de ${targetList.length} processos?`)) return;
+      if (!confirm(`Confirmar o processamento local de ${targetList.length} processos?`)) return;
 
       setIsBatchRunning(true);
       setBatchProgress({ 
@@ -184,7 +193,8 @@ const SearchModule: React.FC<Props> = ({
               const aiResult = await extractMetadataWithAI(context);
               
               if (!aiResult) {
-                  // Interrompe o lote se for erro de chave
+                  // Se o resultado for nulo, algo falhou no serviço (ex: chave inválida)
+                  // Interrompemos o lote para não acumular erros
                   setIsBatchRunning(false);
                   return;
               }
@@ -204,7 +214,15 @@ const SearchModule: React.FC<Props> = ({
                   current: i + 1,
                   processedItems: [`Concluído: ${item.processo}`, ...prev.processedItems].slice(0, 5)
               }));
-          } catch (e) { 
+          } catch (e: any) { 
+              console.error("Batch Item Error:", e);
+              // Se for erro de chave, para tudo
+              if (e.message?.includes("API_KEY") || e.message?.includes("Chave")) {
+                  alert("Processamento interrompido: " + e.message);
+                  setIsBatchRunning(false);
+                  return;
+              }
+              
               setBatchProgress(prev => ({ 
                 ...prev, 
                 errorCount: prev.errorCount + 1,
@@ -216,6 +234,11 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
+      if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+          alert("Por favor, configure a chave de acesso no topo.");
+          return;
+      }
+
       setIsProcessingSingle(item.id);
       try {
           const textLen = item.textoCompleto.length;
@@ -233,6 +256,8 @@ const SearchModule: React.FC<Props> = ({
               if (aiResult.sumario) updated.sumario = aiResult.sumario;
           }
           onUpdateAcordao(updated);
+      } catch (e: any) {
+          alert("Erro no processamento: " + e.message);
       } finally {
           setIsProcessingSingle(null);
       }
@@ -441,7 +466,7 @@ const SearchModule: React.FC<Props> = ({
                                        </div>
                                    )}
                                    <button onClick={() => setSummaryView(item)} className="p-2.5 bg-gray-50 text-gray-600 rounded-xl hover:bg-legal-100 hover:text-legal-900 border border-transparent transition-all shadow-sm" title="Ver Sumário"><Eye className="w-4 h-4" /></button>
-                                   <button onClick={() => openCorrection(item)} className="p-2.5 bg-gray-50 text-gray-600 rounded-xl hover:bg-orange-100 hover:text-orange-900 border border-transparent transition-all shadow-sm" title="Editar"><Edit2 className="w-4 h-4" /></button>
+                                   <button onClick={() => openCorrection(item)} className="p-2.5 bg-gray-50 text-gray-600 rounded-xl hover:bg-orange-100 hover:text-orange-900 border border-transparent shadow-sm transition-all" title="Editar"><Edit2 className="w-4 h-4" /></button>
                                    <button onClick={() => onOpenPdf(item.fileName)} className="p-2.5 bg-legal-900 text-white rounded-xl hover:bg-black shadow-lg transition-all active:scale-95" title="Abrir PDF"><FileText className="w-4 h-4" /></button>
                                </>
                            )}

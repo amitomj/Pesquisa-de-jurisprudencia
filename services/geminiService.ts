@@ -2,28 +2,36 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-// Função interna para garantir que a chave existe antes de criar a instância
+/**
+ * Cria uma nova instância do SDK Gemini garantindo que a chave mais recente é utilizada.
+ * Lança erro específico se a chave não estiver configurada.
+ */
 const getAIInstance = () => {
   const apiKey = process.env.API_KEY;
+  // Em certos ambientes, process.env.API_KEY pode vir como a string "undefined"
   if (!apiKey || apiKey === "undefined") {
     throw new Error("API_KEY_MISSING");
   }
   return new GoogleGenAI({ apiKey });
 };
 
-// Função auxiliar para gerir erros de IA
+/**
+ * Centraliza o tratamento de erros da API.
+ * Não utiliza alert() aqui para evitar popups repetitivos em loops de processamento.
+ */
 const handleAIError = async (error: any) => {
-  console.error("Gemini Error:", error);
+  console.error("Gemini Service Error:", error);
   
   if (error.message === "API_KEY_MISSING") {
-    alert("A chave de acesso não foi detetada. Por favor, clique no botão 'Alterar Chave API' no topo.");
-    return null;
+    throw new Error("Chave de API não configurada.");
   }
 
   if (error.message?.includes("Requested entity was not found")) {
-    alert("A sua API Key parece ser inválida ou expirou. Por favor, reconfigure a chave no topo.");
-    if (window.aistudio) await window.aistudio.openSelectKey();
-    throw new Error("Chave Inválida");
+    // Tenta abrir o seletor automaticamente se a chave for inválida
+    if (window.aistudio?.openSelectKey) {
+      await window.aistudio.openSelectKey();
+    }
+    throw new Error("Chave de API inválida ou expirada.");
   }
   
   throw error;
@@ -41,12 +49,12 @@ export const generateLegalAnswer = async (
 
     const systemPrompt = `
       És um consultor jurídico sénior em Portugal. Analisa os acórdãos e identifica correntes jurisprudenciais.
-      FORMATO DE CITAÇÃO: "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
+      Sempre que citas um acórdão, usa o formato: "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
     `;
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `CONTEXTO (${context.length} docs):\n${relevantContext}\n\nQUESTÃO: ${question}`,
+      contents: `CONTEXTO DE ACÓRDÃOS (${context.length} documentos):\n${relevantContext}\n\nPERGUNTA DO UTILIZADOR: ${question}`,
       config: {
         systemInstruction: systemPrompt,
         temperature: 0.1,
@@ -54,10 +62,10 @@ export const generateLegalAnswer = async (
       }
     });
 
-    return response.text || "Sem resposta.";
+    return response.text || "Não foi possível gerar uma resposta fundamentada.";
   } catch (error) {
     await handleAIError(error);
-    return "Erro ao gerar resposta. Verifique a sua chave de API.";
+    return "Erro técnico na consulta. Por favor, verifique a sua ligação e chave de API.";
   }
 };
 
@@ -66,7 +74,7 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
     const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extrai JSON: data (DD-MM-AAAA), relator, adjuntos (array), sumario.\nTEXTO:\n${textContext}`,
+      contents: `Analisa o texto e extrai os metadados em formato JSON estrito: data (formato DD-MM-AAAA), relator, adjuntos (lista de nomes), e sumario (se existir).\nTEXTO:\n${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -80,8 +88,9 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
         }
       }
     });
-    return response.text ? JSON.parse(response.text) : {};
+    return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
+    // Propaga o erro para o componente decidir se interrompe o lote
     await handleAIError(error);
     return null; 
   }
@@ -92,7 +101,7 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
      const ai = getAIInstance();
      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Escolhe descritores.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
+        contents: `Com base no sumário, escolhe os descritores mais adequados apenas da lista fornecida.\nSUMÁRIO: ${summary}\nLISTA PERMITIDA: ${JSON.stringify(validDescriptors)}`,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }

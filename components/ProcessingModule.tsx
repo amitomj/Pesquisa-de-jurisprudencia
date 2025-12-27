@@ -56,6 +56,13 @@ const ProcessingModule: React.FC<Props> = ({
   };
 
   const processFileList = async (files: File[]) => {
+    // Verificação de segurança da chave antes de iniciar o loop pesado
+    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
+        alert("A chave de acesso não foi detetada. O processamento em lote requer uma chave configurada. Por favor, utilize o botão 'Chave Ativa' no topo.");
+        setProcessing(false);
+        return;
+    }
+
     setLogs(prev => [...prev, `${files.length} ficheiros PDF encontrados. Inicia análise...`]);
 
     const existingFileNames = new Set(existingDB.map(a => a.fileName));
@@ -90,12 +97,21 @@ const ProcessingModule: React.FC<Props> = ({
                     : data.textoCompleto.substring(0, 3000) + "\n...[CORTE]...\n" + data.textoCompleto.substring(textLen - 3000);
 
                 const aiResult = await extractMetadataWithAI(context);
+                
+                if (!aiResult) {
+                    // Se o serviço falhar (ex: erro de chave), paramos o lote imediatamente
+                    setLogs(prev => [...prev, "❌ Processamento interrompido devido a erro na API (Chave ausente ou inválida)."]);
+                    break; 
+                }
+
                 if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
                 if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
                 if (aiResult.adjuntos && aiResult.adjuntos.length > 0) data.adjuntos = aiResult.adjuntos;
                 if (isSumarioMissing && aiResult.sumario && aiResult.sumario.length > 20) data.sumario = aiResult.sumario;
             } catch (aiError) {
                 console.warn("AI Metadata failed", aiError);
+                // Se o erro for de chave, pára o loop
+                if ((aiError as Error).message?.includes("Chave") || (aiError as Error).message?.includes("API_KEY")) break;
             }
         }
 
@@ -143,7 +159,6 @@ const ProcessingModule: React.FC<Props> = ({
     }
   };
 
-  // Fixed handleLegacyFileSelect: Cast Array.from(e.target.files) to File[] to resolve 'unknown' type inference and missing property errors.
   const handleLegacyFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setShowLegacyFallback(false);
@@ -178,7 +193,6 @@ const ProcessingModule: React.FC<Props> = ({
       if (confirm(`Confirmar fusão de identidades?\n\nOrigem: "${mergeSecondary}"\nDestino: "${mergeMain}"`)) {
           onMergeJudges(mergeMain.trim(), [mergeSecondary.trim()]);
           setMergeSecondary('');
-          // Mantemos o mergeMain caso o utilizador queira fundir outro nome no mesmo destino
       }
   };
 
@@ -216,25 +230,25 @@ const ProcessingModule: React.FC<Props> = ({
         ) : (
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-4">
-                <button onClick={handleSelectFolder} disabled={processing} className="bg-legal-600 hover:bg-legal-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 disabled:opacity-50">
+                <button onClick={handleSelectFolder} disabled={processing} className="bg-legal-600 hover:bg-legal-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 disabled:opacity-50 transition-all shadow-lg active:scale-95">
                   {processing ? <RefreshCw className="animate-spin w-5 h-5"/> : <FilePlus className="w-5 h-5"/>}
                   {rootHandleName ? `Sincronizar: ${rootHandleName}` : 'Selecionar Pasta Mãe'}
                 </button>
                 {rootHandleName && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Pasta vinculada</span>}
               </div>
-              <p className="text-xs text-gray-400">Nota: O sistema analisará todos os PDFs na pasta e subpastas.</p>
+              <p className="text-xs text-gray-400 font-medium">Nota: O sistema analisará todos os PDFs na pasta e subpastas. Requer chave de API ativa para correções automáticas.</p>
             </div>
         )}
         <input type="file" ref={legacyInputRef} className="hidden" onChange={handleLegacyFileSelect} multiple webkitdirectory="" />
       </div>
       
       {logs.length > 0 && (
-        <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm h-48 overflow-y-auto shadow-inner border border-gray-700">
+        <div className="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm h-48 overflow-y-auto shadow-inner border border-gray-700 custom-scrollbar">
           <div className="sticky top-0 bg-gray-900 pb-2 border-b border-gray-800 mb-2 font-bold text-white flex justify-between">
               <span>Log de Processamento</span>
               {processing && <span className="animate-pulse text-yellow-400">EM CURSO...</span>}
           </div>
-          {logs.map((log, i) => <div key={i} className="mb-1">{log}</div>)}
+          {logs.map((log, i) => <div key={i} className="mb-1 text-xs">{log}</div>)}
         </div>
       )}
 
@@ -243,17 +257,17 @@ const ProcessingModule: React.FC<Props> = ({
                <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><Users className="w-5 h-5 text-legal-600"/> Gestão de Identidades (Juízes)</h3>
                <div className="flex flex-col md:flex-row gap-4 items-end bg-gray-50 p-4 rounded-lg">
                    <div className="flex-1 w-full">
-                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Variação a Corrigir</label>
-                       <input list="judges-list" className="w-full p-2 border rounded text-sm" placeholder="Nome original no PDF..." value={mergeSecondary} onChange={e => setMergeSecondary(e.target.value)} />
+                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block tracking-widest">Variação a Corrigir</label>
+                       <input list="judges-list" className="w-full p-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-legal-100" placeholder="Nome original no PDF..." value={mergeSecondary} onChange={e => setMergeSecondary(e.target.value)} />
                    </div>
                    <div className="flex items-center justify-center mb-2 px-2">
                        <ArrowRight className="w-5 h-5 text-gray-400" />
                    </div>
                    <div className="flex-1 w-full">
-                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Nome Correto / Oficial</label>
-                       <input list="judges-list" className="w-full p-2 border rounded text-sm" placeholder="Nome para o qual converter..." value={mergeMain} onChange={e => setMergeMain(e.target.value)} />
+                       <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block tracking-widest">Nome Correto / Oficial</label>
+                       <input list="judges-list" className="w-full p-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-legal-100" placeholder="Nome para o qual converter..." value={mergeMain} onChange={e => setMergeMain(e.target.value)} />
                    </div>
-                   <button onClick={triggerMerge} disabled={!mergeMain.trim() || !mergeSecondary.trim()} className="bg-orange-600 text-white px-6 py-2 rounded shadow hover:bg-orange-700 disabled:opacity-30 font-bold transition-all">
+                   <button onClick={triggerMerge} disabled={!mergeMain.trim() || !mergeSecondary.trim()} className="bg-orange-600 text-white px-8 py-2.5 rounded-xl shadow-lg hover:bg-orange-700 disabled:opacity-30 font-black uppercase text-xs tracking-widest transition-all">
                        Fundir
                    </button>
                </div>
@@ -262,19 +276,19 @@ const ProcessingModule: React.FC<Props> = ({
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><UserPlus className="w-5 h-5 text-legal-600"/> Adicionar Juízes</h3>
-              <textarea className="w-full h-24 p-3 border rounded text-sm outline-none" placeholder="Um nome por linha..." value={judgeInput} onChange={e => setJudgeInput(e.target.value)}/>
-              <div className="mt-3 flex justify-end"><button onClick={handleAddJudges} disabled={!judgeInput.trim()} className="bg-legal-600 text-white px-3 py-1.5 rounded text-sm hover:bg-legal-700 disabled:opacity-50">Adicionar</button></div>
+              <textarea className="w-full h-24 p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-legal-100" placeholder="Um nome por linha..." value={judgeInput} onChange={e => setJudgeInput(e.target.value)}/>
+              <div className="mt-3 flex justify-end"><button onClick={handleAddJudges} disabled={!judgeInput.trim()} className="bg-legal-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-legal-700 disabled:opacity-50 transition-all">Adicionar</button></div>
           </div>
 
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <h3 className="text-lg font-bold text-gray-800 mb-3 flex items-center gap-2"><Tag className="w-5 h-5 text-legal-600"/> Adicionar Descritores</h3>
               <div className="flex gap-2 mb-2">
-                  <button onClick={() => setDescriptorCategory('social')} className={`px-2 py-1 rounded text-xs font-bold ${descriptorCategory === 'social' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100'}`}>Social</button>
-                  <button onClick={() => setDescriptorCategory('crime')} className={`px-2 py-1 rounded text-xs font-bold ${descriptorCategory === 'crime' ? 'bg-red-100 text-red-800' : 'bg-gray-100'}`}>Crime</button>
-                  <button onClick={() => setDescriptorCategory('civil')} className={`px-2 py-1 rounded text-xs font-bold ${descriptorCategory === 'civil' ? 'bg-green-100 text-green-800' : 'bg-gray-100'}`}>Cível</button>
+                  <button onClick={() => setDescriptorCategory('social')} className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter transition-all ${descriptorCategory === 'social' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>Social</button>
+                  <button onClick={() => setDescriptorCategory('crime')} className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter transition-all ${descriptorCategory === 'crime' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>Crime</button>
+                  <button onClick={() => setDescriptorCategory('civil')} className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-tighter transition-all ${descriptorCategory === 'civil' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>Cível</button>
               </div>
-              <textarea className="w-full h-24 p-3 border rounded text-sm outline-none" placeholder="Descritores (um por linha)..." value={descriptorInput} onChange={e => setDescriptorInput(e.target.value)}/>
-              <div className="mt-3 flex justify-end"><button onClick={handleAddDescriptors} disabled={!descriptorInput.trim()} className="bg-legal-600 text-white px-3 py-1.5 rounded text-sm hover:bg-legal-700 disabled:opacity-50">Adicionar</button></div>
+              <textarea className="w-full h-24 p-3 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-legal-100" placeholder="Descritores (um por linha)..." value={descriptorInput} onChange={e => setDescriptorInput(e.target.value)}/>
+              <div className="mt-3 flex justify-end"><button onClick={handleAddDescriptors} disabled={!descriptorInput.trim()} className="bg-legal-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-legal-700 disabled:opacity-50 transition-all">Adicionar</button></div>
           </div>
       </div>
     </div>
