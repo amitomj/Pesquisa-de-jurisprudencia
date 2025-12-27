@@ -1,0 +1,5 @@
+{
+  "name": "Pesquisa de Jurisprudencia",
+  "description": "Ferramenta offline de análise de acórdãos, extração de dados e assistente jurídico.",
+  "requestFramePermissions": []
+}
