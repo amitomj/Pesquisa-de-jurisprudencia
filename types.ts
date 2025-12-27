@@ -48,21 +48,12 @@ export interface SearchResult {
   date: number;
 }
 
-/**
- * Interface representing the AI Studio API for key management.
- * This matches the structure expected by the ambient type system.
- */
-export interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
-// Global window extension for PDF.js and AI Studio API
+// Global window extension for PDF.js and Native APIs
 declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
-    // Fixed: Named the type as AIStudio and made it optional to match the ambient declaration's modifiers and type name.
-    aistudio?: AIStudio;
+    // Note: window.aistudio and the AIStudio type are provided by the ambient environment.
+    // Redeclaring them here causes conflict errors when the local name shadows the global one.
   }
 }

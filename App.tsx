@@ -1,10 +1,10 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Database, Search, MessageSquareText, UploadCloud, Save, FolderUp, FileUp, Download, Briefcase, Gavel, Key, ExternalLink, Scale as ScaleIcon } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -30,8 +30,12 @@ function App() {
   useEffect(() => {
     const checkKey = async () => {
       if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasUserKey(selected);
+        try {
+          const selected = await window.aistudio.hasSelectedApiKey();
+          setHasUserKey(selected);
+        } catch (e) {
+          console.warn("AI Studio key check failed", e);
+        }
       }
     };
     checkKey();
@@ -39,8 +43,15 @@ function App() {
 
   const handleConfigKey = async () => {
     if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasUserKey(true); // Assume sucesso para proceder
+      try {
+        await window.aistudio.openSelectKey();
+        // Após abrir o diálogo, assumimos sucesso para atualizar a UI
+        setHasUserKey(true);
+      } catch (e) {
+        console.error("Failed to open key selector", e);
+      }
+    } else {
+      alert("O seletor de chaves nativo não está disponível neste ambiente.");
     }
   };
 
@@ -139,15 +150,15 @@ function App() {
           <div className="flex items-center gap-2">
             <Scale className="w-8 h-8 text-legal-200" />
             <div>
-              <h1 className="text-xl font-bold">JurisAnalítica Local</h1>
-              <p className="text-[10px] text-legal-300 uppercase tracking-widest">Privacidade Total • {legalArea}</p>
+              <h1 className="text-xl font-bold tracking-tight">JurisAnalítica</h1>
+              <p className="text-[9px] text-legal-300 uppercase tracking-widest font-bold">Privacidade Total • {legalArea}</p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
             <button 
               onClick={handleConfigKey} 
-              className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-bold transition-colors ${hasUserKey ? 'bg-green-600/20 text-green-400 border border-green-600/50' : 'bg-orange-600/20 text-orange-400 border border-orange-600/50'}`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all shadow-sm ${hasUserKey ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-legal-700 text-legal-200 hover:bg-legal-600 border border-legal-600'}`}
               title="Configurar a sua própria API Key para usar saldo pessoal."
             >
               <Key className="w-3.5 h-3.5" />
@@ -155,9 +166,9 @@ function App() {
             </button>
             <div className="h-6 w-px bg-legal-700"></div>
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
-            <button onClick={() => fileInputRef.current?.click()} className="text-xs hover:text-white text-legal-300">Carregar</button>
-            <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-1.5 bg-green-600 hover:bg-green-700 rounded text-sm font-bold shadow-sm transition-colors">
-              <Save className="w-4 h-4" /> Guardar
+            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-bold uppercase tracking-tighter text-legal-300 hover:text-white transition-colors">Carregar</button>
+            <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95">
+              <Save className="w-4 h-4" /> Guardar Backup
             </button>
           </div>
         </div>
@@ -178,10 +189,10 @@ function App() {
           />
         ) : (
           <>
-            <div className="bg-white border-b px-6 pt-2 flex gap-6 flex-shrink-0">
+            <div className="bg-white border-b px-6 pt-2 flex gap-6 flex-shrink-0 shadow-sm z-10">
                {['process', 'search', 'chat'].map((tab: any) => (
-                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors capitalize ${activeTab === tab ? 'border-legal-600 text-legal-800' : 'border-transparent text-gray-500'}`}>
-                    {tab}
+                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 text-sm font-bold border-b-2 transition-all capitalize tracking-tight ${activeTab === tab ? 'border-legal-600 text-legal-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                    {tab === 'process' ? '⚙️ Processamento' : tab === 'search' ? '🔍 Biblioteca' : '💬 Consultoria'}
                  </button>
                ))}
             </div>
