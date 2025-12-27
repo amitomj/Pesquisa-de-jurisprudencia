@@ -4,8 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-// Added 'Info' to the imports to fix the error on line 201
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ShieldCheck, ArrowRight, Lock, CheckCircle2, RotateCcw, AlertTriangle, Info } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ArrowRight, Lock, RotateCcw, AlertTriangle, Info, Sparkles } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -24,54 +23,47 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
-  const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
-  const [keyActionTriggered, setKeyActionTriggered] = useState(false);
+  
+  // Estado de Onboarding: 'welcome' -> 'area' -> 'app'
+  const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'area' | 'app'>('welcome');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Efeito para verificar se a chave já está configurada
+  // Verifica se já existe chave ao carregar
   useEffect(() => {
-    const checkKey = async () => {
-      // @ts-ignore
+    const checkExistingKey = async () => {
       if (window.aistudio?.hasSelectedApiKey) {
-        try {
-          // @ts-ignore
-          const selected = await window.aistudio.hasSelectedApiKey();
-          if (selected) setOnboardingStep('area');
-        } catch (e) {}
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        if (hasKey) setOnboardingStep('area');
       }
     };
-    checkKey();
+    checkExistingKey();
   }, []);
 
-  const handleOpenKeySelector = async () => {
-    // @ts-ignore
+  const handleStartSetup = async () => {
     if (window.aistudio?.openSelectKey) {
-      try {
-        // Abre o diálogo do sistema (o campo de inserção aparece numa popup do browser/sistema)
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-        setKeyActionTriggered(true);
-      } catch (e) {
-        setKeyActionTriggered(true);
-      }
+      // Abre o diálogo do sistema (janela nativa da plataforma)
+      await window.aistudio.openSelectKey();
+      // Regra: Assumir sucesso imediatamente para mitigar race conditions
+      setOnboardingStep('area');
     } else {
-      setKeyActionTriggered(true);
+      // Se não houver suporte aistudio (ambiente dev local), avança
+      setOnboardingStep('area');
     }
   };
 
-  const handleProceedToApp = () => {
-    setOnboardingStep('area');
+  const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
+    setLegalArea(area);
+    setOnboardingStep('app');
   };
 
   const handleUpdateKeyInApp = async () => {
-    // @ts-ignore
     if (window.aistudio?.openSelectKey) {
-      // @ts-ignore
       await window.aistudio.openSelectKey();
     }
   };
 
+  // --- Lógica de Base de Dados ---
   const updateJudgesList = (currentDb: Acordao[]) => {
     const extracted = new Set<string>();
     currentDb.forEach(ac => {
@@ -100,7 +92,6 @@ function App() {
     });
     setDb(updatedDb);
     updateJudgesList(updatedDb);
-    alert(`Identidades fundidas com sucesso.`);
   };
 
   const handleSetRoot = (handle: FileSystemDirectoryHandle) => {
@@ -135,7 +126,7 @@ function App() {
     if (buffer) {
       const blob = new Blob([buffer], { type: 'application/pdf' });
       window.open(URL.createObjectURL(blob), '_blank');
-    } else alert('Ficheiro não encontrado.');
+    }
   };
 
   const handleSaveDb = () => {
@@ -157,96 +148,74 @@ function App() {
         if (parsed.db) setDb(prev => [...prev, ...parsed.db.filter((x:any) => !prev.find(p=>p.id===x.id))]);
         if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
         if (parsed.chatSessions) setChatSessions(parsed.chatSessions);
-        alert('Dados importados.');
-        setActiveTab('search');
         setOnboardingStep('app');
-      } catch (err) { alert('Erro ao carregar ficheiro.'); }
+      } catch (err) {}
     };
     reader.readAsText(file);
   };
 
-  const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
-    setLegalArea(area);
-    setOnboardingStep('app');
-  };
-
-  // Render Onboarding
+  // --- RENDER ONBOARDING ---
   if (onboardingStep !== 'app') {
     return (
       <div className="fixed inset-0 bg-legal-900 z-[100] flex items-center justify-center p-4">
         <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-xl w-full text-center animate-in zoom-in-95 duration-500 overflow-hidden relative border-t-8 border-legal-600">
           
-          {onboardingStep === 'key' ? (
+          {onboardingStep === 'welcome' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="mb-8 flex justify-center">
                 <div className="p-6 bg-blue-50 rounded-full">
-                  <Lock className="w-12 h-12 text-blue-600"/>
+                  <Scale className="w-12 h-12 text-blue-600"/>
                 </div>
               </div>
-              <h2 className="text-3xl font-black mb-3 tracking-tighter text-legal-900">JurisAnalítica</h2>
+              <h2 className="text-3xl font-black mb-3 tracking-tighter text-legal-900 uppercase">JurisAnalítica</h2>
               <p className="text-gray-500 mb-8 font-medium">
-                Para iniciar a análise local, deve configurar primeiro a sua chave Gemini API.
+                Plataforma local de análise jurisprudencial assistida por Inteligência Artificial.
               </p>
               
-              <div className="space-y-4">
-                <div className={`p-6 rounded-3xl border-2 transition-all ${keyActionTriggered ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
-                    <button 
-                      onClick={handleOpenKeySelector} 
-                      className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 transition-all ${keyActionTriggered ? 'bg-green-600 text-white shadow-lg' : 'bg-legal-900 text-white hover:bg-black shadow-xl active:scale-95'}`}
-                    >
-                      {keyActionTriggered ? <CheckCircle2 className="w-5 h-5" /> : <Key className="w-5 h-5 text-legal-200" />}
-                      {keyActionTriggered ? 'Passo 1 Concluído' : '1. Abrir Janela da Chave'}
-                    </button>
-                    {!keyActionTriggered && (
-                        <p className="text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-widest leading-tight">
-                           <Info className="w-3 h-3 inline mr-1 mb-0.5"/> Procure a janela do sistema que irá pedir para colar a sua chave.
-                        </p>
-                    )}
+              <div className="bg-gray-50 p-8 rounded-3xl border border-gray-100 mb-8">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Configuração Necessária</p>
+                <button 
+                  onClick={handleStartSetup} 
+                  className="w-full bg-legal-900 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black shadow-2xl transition-all active:scale-95"
+                >
+                  <Key className="w-5 h-5 text-legal-300" />
+                  Ativar Chave de Acesso IA
+                </button>
+                <div className="mt-4 flex items-start gap-2 text-left">
+                  <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[10px] text-gray-500 leading-relaxed italic">
+                    Ao clicar, o sistema abrirá uma janela para selecionar a sua Chave Gemini. Sem esta configuração, o processamento de texto não funcionará.
+                  </p>
                 </div>
-
-                {keyActionTriggered && (
-                  <button 
-                    onClick={handleProceedToApp} 
-                    className="w-full bg-legal-900 text-white p-6 rounded-3xl font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-95 animate-in slide-in-from-top-2"
-                  >
-                    2. Continuar para Áreas
-                    <ArrowRight className="w-5 h-5" />
-                  </button>
-                )}
               </div>
 
-              {!keyActionTriggered && (
-                <div className="mt-8 flex items-start gap-3 text-left bg-orange-50 p-4 rounded-2xl border border-orange-100">
-                    <AlertTriangle className="w-5 h-5 text-orange-600 flex-shrink-0" />
-                    <p className="text-[10px] text-orange-800 font-bold uppercase tracking-tight leading-normal">
-                        Nota: Se não aparecer nenhuma janela após o clique, verifique se o seu browser está a bloquear popups ou se já existe uma chave guardada.
-                    </p>
-                </div>
-              )}
+              <div className="flex items-center gap-4 justify-center">
+                <button onClick={() => fileInputRef.current?.click()} className="text-[10px] font-black uppercase tracking-widest text-legal-400 hover:text-legal-900 transition-all">Importar Backup Anterior</button>
+              </div>
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
               <div className="mb-8 flex justify-center">
                 <div className="p-6 bg-legal-50 rounded-full">
-                  {legalArea === 'social' ? <Briefcase className="w-12 h-12 text-legal-700"/> : legalArea === 'crime' ? <Gavel className="w-12 h-12 text-legal-700"/> : <ScaleIcon className="w-12 h-12 text-legal-700"/>}
+                  <Sparkles className="w-12 h-12 text-legal-700"/>
                 </div>
               </div>
-              <h2 className="text-3xl font-black mb-2 tracking-tighter text-legal-900">Área de Atuação</h2>
-              <p className="text-gray-500 mb-10 font-medium">Selecione a jurisdição pretendida.</p>
+              <h2 className="text-3xl font-black mb-2 tracking-tighter text-legal-900 uppercase">Jurisdição</h2>
+              <p className="text-gray-500 mb-10 font-medium italic">Selecione a área jurídica para carregar os descritores adequados.</p>
               
               <div className="grid grid-cols-1 gap-4">
                 {['social', 'crime', 'civil'].map((area: any) => (
                   <button 
                     key={area} 
                     onClick={() => selectLegalArea(area)} 
-                    className={`group p-5 rounded-3xl border-2 transition-all flex items-center gap-5 text-left active:scale-95 ${legalArea === area ? 'border-legal-600 bg-legal-50 shadow-md' : 'border-gray-100 hover:border-legal-600 hover:bg-legal-50'}`}
+                    className="group p-5 rounded-3xl border-2 border-gray-100 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-5 text-left active:scale-95"
                   >
-                    <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all">
+                    <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all shadow-sm">
                       {area === 'social' ? <Briefcase className="w-7 h-7 text-legal-600"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-legal-600"/> : <ScaleIcon className="w-7 h-7 text-legal-600"/>}
                     </div>
                     <div>
                         <div className="capitalize font-black text-xl text-gray-800 tracking-tight">Área {area}</div>
-                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Clique para aceder</div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Entrar no painel</div>
                     </div>
                   </button>
                 ))}
@@ -254,22 +223,24 @@ function App() {
             </div>
           )}
         </div>
+        <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
       </div>
     );
   }
 
+  // --- APP MAIN INTERFACE ---
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans selection:bg-legal-100">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
         <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="p-2.5 bg-legal-800 rounded-2xl border border-legal-700">
-                <Scale className="w-8 h-8 text-legal-100" />
+                <ScaleIcon className="w-8 h-8 text-legal-100" />
             </div>
             <div>
               <h1 className="text-2xl font-black tracking-tighter leading-none">JurisAnalítica</h1>
               <div className="flex items-center gap-2 mt-1">
-                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">Sessão Ativa • {legalArea}</p>
+                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">Sessão: {legalArea}</p>
                 <button onClick={() => setOnboardingStep('area')} className="text-[9px] bg-legal-700 hover:bg-legal-600 px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 transition-all">
                    <RotateCcw className="w-2.5 h-2.5" /> Mudar Área
                 </button>
@@ -280,13 +251,12 @@ function App() {
           <div className="flex items-center gap-4">
             <button 
               onClick={handleUpdateKeyInApp}
-              className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full hover:bg-green-800/40 transition-all"
+              className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full hover:bg-green-800/40 transition-all group"
             >
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse group-hover:scale-125 transition-transform"></div>
               <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Chave Ativa</span>
             </button>
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
             <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all">Importar</button>
             <button onClick={handleSaveDb} className="flex items-center gap-2.5 px-6 py-3 bg-white text-legal-900 hover:bg-legal-100 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
               <Save className="w-4 h-4" /> Exportar Backup
@@ -339,6 +309,7 @@ function App() {
           </>
         )}
       </div>
+      <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
     </div>
   );
 }
