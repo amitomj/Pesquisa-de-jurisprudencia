@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, Settings } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, Settings, ShieldCheck, ArrowRight, ExternalLink } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -24,49 +24,96 @@ function App() {
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   const [hasUserKey, setHasUserKey] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const checkKey = async () => {
+    const checkInitialState = async () => {
       // @ts-ignore
       if (window.aistudio?.hasSelectedApiKey) {
         try {
           // @ts-ignore
           const selected = await window.aistudio.hasSelectedApiKey();
           setHasUserKey(selected);
+          if (selected) {
+            setOnboardingStep('area');
+          }
         } catch (e) {
-          console.warn("Verificação de API Key indisponível.");
+          console.warn("Verificação inicial de API Key indisponível.");
         }
       }
     };
-    checkKey();
+    checkInitialState();
   }, []);
 
-  const handleConfigKey = async () => {
+  const handleStartKeyConfig = async () => {
     // @ts-ignore
     if (window.aistudio?.openSelectKey) {
       try {
         // @ts-ignore
         await window.aistudio.openSelectKey();
-        // Assumimos verdadeiro após abrir o seletor para que a UI mude
         setHasUserKey(true);
+        // Avança para a próxima etapa imediatamente após o gatilho, mitigando race conditions
+        setOnboardingStep('area');
       } catch (e) {
         console.error("Falha ao abrir seletor de chaves:", e);
       }
     } else {
-      alert("A funcionalidade de configuração de chave pessoal não está disponível neste ambiente. O sistema continuará a utilizar a chave gratuita por defeito.");
+      // Se não houver aistudio (ex: dev local), permitimos avançar para não bloquear o app
+      setOnboardingStep('area');
     }
   };
 
-  useEffect(() => {
+  const handleConfigKeyInApp = async () => {
+    // @ts-ignore
+    if (window.aistudio?.openSelectKey) {
+      try {
+        // @ts-ignore
+        await window.aistudio.openSelectKey();
+        setHasUserKey(true);
+      } catch (e) {
+        console.error("Falha ao abrir seletor de chaves:", e);
+      }
+    }
+  };
+
+  const updateJudgesList = (currentDb: Acordao[]) => {
     const extracted = new Set<string>();
-    db.forEach(ac => {
+    currentDb.forEach(ac => {
       if (ac.relator && ac.relator !== 'Desconhecido') extracted.add(ac.relator.trim());
       ac.adjuntos.forEach(adj => { if (adj) extracted.add(adj.trim()); });
     });
-    setJudges(prev => Array.from(new Set([...prev, ...extracted])).sort());
+    setJudges(Array.from(extracted).sort());
+  };
+
+  useEffect(() => {
+    updateJudgesList(db);
   }, [db]);
+
+  const handleMergeJudges = (main: string, others: string[]) => {
+    const updatedDb = db.map(ac => {
+      let changed = false;
+      let newRelator = ac.relator;
+      if (others.includes(ac.relator)) {
+        newRelator = main;
+        changed = true;
+      }
+      
+      const newAdjuntos = ac.adjuntos.map(adj => others.includes(adj) ? main : adj);
+      const uniqueAdjuntos = Array.from(new Set(newAdjuntos)).filter(a => a !== newRelator);
+      
+      if (JSON.stringify(uniqueAdjuntos) !== JSON.stringify(ac.adjuntos)) {
+        changed = true;
+      }
+
+      return changed ? { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos } : ac;
+    });
+
+    setDb(updatedDb);
+    updateJudgesList(updatedDb);
+    alert(`Identidades fundidas com sucesso em ${updatedDb.length} registos.`);
+  };
 
   const handleSetRoot = (handle: FileSystemDirectoryHandle) => {
     setRootHandle(handle);
@@ -124,36 +171,97 @@ function App() {
         if (parsed.chatSessions) setChatSessions(parsed.chatSessions);
         alert('Base de dados carregada com sucesso!');
         setActiveTab('search');
+        setOnboardingStep('app');
       } catch (err) { alert('Erro ao carregar ficheiro JSON.'); }
     };
     reader.readAsText(file);
   };
 
+  const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
+    setLegalArea(area);
+    setOnboardingStep('app');
+  };
+
+  // Render Onboarding
+  if (onboardingStep !== 'app') {
+    return (
+      <div className="fixed inset-0 bg-legal-900 z-[100] flex items-center justify-center p-4">
+        <div className="bg-white rounded-[40px] shadow-2xl p-10 max-w-xl w-full text-center animate-in zoom-in-95 duration-500 overflow-hidden relative">
+          
+          {/* Background decoration */}
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-legal-600 via-blue-500 to-legal-900"></div>
+
+          {onboardingStep === 'key' ? (
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <div className="mb-8 flex justify-center">
+                <div className="p-6 bg-blue-50 rounded-[30px] border border-blue-100">
+                  <ShieldCheck className="w-14 h-14 text-blue-600"/>
+                </div>
+              </div>
+              <h2 className="text-3xl font-black mb-4 tracking-tighter text-legal-900">Segurança & IA</h2>
+              <p className="text-gray-500 mb-8 font-medium leading-relaxed">
+                Para garantir respostas rápidas e acesso às funcionalidades avançadas (Gemini 3 Pro), configure a sua chave de acesso. Pode usar uma chave gratuita ou uma conta com faturação ativada.
+              </p>
+              
+              <div className="space-y-4">
+                <button 
+                  onClick={handleStartKeyConfig} 
+                  className="w-full group bg-legal-900 text-white p-6 rounded-[2rem] font-black uppercase tracking-widest text-xs flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl active:scale-95"
+                >
+                  <Key className="w-5 h-5 text-legal-200" />
+                  Configurar Chave API
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </button>
+                
+                <div className="pt-6 border-t border-gray-100">
+                  <a 
+                    href="https://ai.google.dev/gemini-api/docs/billing" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-widest flex items-center justify-center gap-1.5"
+                  >
+                    Documentação de Faturação <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <p className="text-[9px] text-gray-400 mt-2 italic">A sua chave é processada localmente e nunca é enviada para os nossos servidores.</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+              <div className="mb-8 flex justify-center">
+                <div className="p-6 bg-legal-50 rounded-[30px] border border-legal-100">
+                  <ScaleIcon className="w-14 h-14 text-legal-700"/>
+                </div>
+              </div>
+              <h2 className="text-3xl font-black mb-2 tracking-tighter text-legal-900">JurisAnalítica</h2>
+              <p className="text-gray-500 mb-10 font-medium italic">Chave configurada com sucesso. Selecione agora a jurisdição.</p>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {['social', 'crime', 'civil'].map((area: any) => (
+                  <button 
+                    key={area} 
+                    onClick={() => selectLegalArea(area)} 
+                    className="group p-6 rounded-3xl border-2 border-gray-100 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-5 text-left shadow-sm hover:shadow-xl active:scale-95"
+                  >
+                    <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all shadow-sm">
+                      {area === 'social' ? <Briefcase className="w-7 h-7 text-legal-600"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-legal-600"/> : <ScaleIcon className="w-7 h-7 text-legal-600"/>}
+                    </div>
+                    <div>
+                        <div className="capitalize font-black text-xl text-gray-800 tracking-tight">Área {area}</div>
+                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Otimizar motor para esta área</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans selection:bg-legal-100">
-      {!legalArea && (
-          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
-              <div className="bg-white rounded-[40px] shadow-2xl p-12 max-w-xl w-full text-center animate-in zoom-in-95 duration-500">
-                  <div className="mb-8 flex justify-center"><div className="p-6 bg-legal-50 rounded-[30px]"><ScaleIcon className="w-12 h-12 text-legal-700"/></div></div>
-                  <h2 className="text-3xl font-black mb-2 tracking-tighter">JurisAnalítica</h2>
-                  <p className="text-gray-500 mb-10 font-medium">Selecione a jurisdição para configurar o motor de IA.</p>
-                  <div className="grid grid-cols-1 gap-4">
-                      {['social', 'crime', 'civil'].map((area: any) => (
-                        <button key={area} onClick={() => setLegalArea(area)} className="group p-6 rounded-3xl border-2 border-gray-100 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-5 text-left shadow-sm hover:shadow-xl active:scale-95">
-                           <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all shadow-sm">
-                            {area === 'social' ? <Briefcase className="w-7 h-7 text-legal-600"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-legal-600"/> : <ScaleIcon className="w-7 h-7 text-legal-600"/>}
-                           </div>
-                           <div>
-                               <div className="capitalize font-black text-xl text-gray-800 tracking-tight">Área {area}</div>
-                               <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configurar Descritores Automáticos</div>
-                           </div>
-                        </button>
-                      ))}
-                  </div>
-              </div>
-          </div>
-      )}
-
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
         <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -168,12 +276,12 @@ function App() {
           
           <div className="flex items-center gap-4">
             <button 
-              onClick={handleConfigKey} 
+              onClick={handleConfigKeyInApp} 
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 border-2 ${hasUserKey ? 'bg-green-600 text-white border-green-500' : 'bg-legal-800 text-legal-200 border-legal-700 hover:border-legal-500 hover:bg-legal-700'}`}
               title="Configurar a sua própria API Key para usar saldo pessoal."
             >
               <Key className="w-4 h-4" />
-              {hasUserKey ? 'Key: Pessoal' : 'Configurar API'}
+              {hasUserKey ? 'Key: Ativa' : 'Configurar API'}
             </button>
             
             <div className="h-10 w-px bg-legal-700 opacity-30"></div>
@@ -197,6 +305,7 @@ function App() {
             onCacheFiles={setCachedFiles}
             onAddDescriptors={(cat, list) => setDescriptors(p => ({...p, [cat]: Array.from(new Set([...p[cat], ...list])).sort()}))}
             onAddJudges={(list) => setJudges(p => Array.from(new Set([...p, ...list])).sort())}
+            onMergeJudges={handleMergeJudges}
             availableJudges={judges}
             availableDescriptors={legalArea ? descriptors[legalArea] : []}
           />
@@ -210,7 +319,20 @@ function App() {
                ))}
             </div>
             <div className="flex-1 overflow-hidden bg-gray-50 relative">
-               {activeTab === 'process' && <ProcessingModule onDataLoaded={d => setDb(p => [...p, ...d])} existingDB={db} onSetRootHandle={handleSetRoot} rootHandleName={rootHandleName} onCacheFiles={setCachedFiles} onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} onAddJudges={setJudges} availableJudges={judges} availableDescriptors={legalArea?descriptors[legalArea]:[]}/>}
+               {activeTab === 'process' && (
+                 <ProcessingModule 
+                   onDataLoaded={d => setDb(p => [...p, ...d])} 
+                   existingDB={db} 
+                   onSetRootHandle={handleSetRoot} 
+                   rootHandleName={rootHandleName} 
+                   onCacheFiles={setCachedFiles} 
+                   onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
+                   onAddJudges={setJudges} 
+                   onMergeJudges={handleMergeJudges}
+                   availableJudges={judges} 
+                   availableDescriptors={legalArea?descriptors[legalArea]:[]}
+                 />
+               )}
                {activeTab === 'search' && <SearchModule db={db} onSaveSearch={s => setSavedSearches(p => [...p, s])} savedSearches={savedSearches} onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} onOpenPdf={openPdf} onGetPdfData={getPdfData} onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} availableDescriptors={legalArea?descriptors[legalArea]:[]} availableJudges={judges} onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}/>}
                {activeTab === 'chat' && <ChatModule db={db} sessions={chatSessions} onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} onOpenPdf={openPdf}/>}
             </div>
