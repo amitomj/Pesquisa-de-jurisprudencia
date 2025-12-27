@@ -7,36 +7,42 @@ export const generateLegalAnswer = async (
 ): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // Prepare context - limit to avoid token limits
+  // Prepara o contexto, limitando para evitar exceder tokens, mas mantendo o ID vital para o UI
   const relevantContext = context.map(c => 
-    `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto Análise: ${c.textoAnalise.substring(0, 1000)}...`
+    `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 800)}...`
   ).join('\n---\n');
 
   const systemPrompt = `
-    És um assistente jurídico de elite em Portugal. O teu objetivo é analisar acórdãos e responder a questões jurídicas.
+    És um consultor jurídico sénior em Portugal, especializado em análise de jurisprudência.
     
     ESTRUTURA DA RESPOSTA:
-    Se houver divergência (Acórdão Fundamento vs Acórdão Recorrido ou correntes distintas):
-    1. Apresenta a "Posição A", os seus argumentos e cita até 5 acórdãos (os mais recentes).
-    2. Apresenta a "Posição B", os seus argumentos e cita até 5 acórdãos (os mais recentes).
-    3. Se houver mais de 5 acórdãos para uma posição, escolhe apenas os 5 mais relevantes/recentes.
+    Analisa os acórdãos fornecidos e verifica se existe uma corrente jurisprudencial uniforme ou se há divergência.
 
-    FORMATO DE CITAÇÃO OBRIGATÓRIO:
-    Sempre que citares um acórdão, deves usar exatamente este formato no fim da linha:
-    "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
-    Exemplo: "Nuno de Oliveira, Proc. 123/22.4, 12-01-2024 (ref: 550e8400-e29b-41d4-a716-446655440000)"
+    1. SE HOUVER DIVERGÊNCIA (Correntes Opostas):
+       - Identifica a "Posição A" (ex: Corrente Majoritária ou Acórdão Fundamento). Expõe os fundamentos e cita NO MÁXIMO 5 acórdãos que a sustentam.
+       - Identifica a "Posição B" (ex: Corrente Minoritária ou Acórdão Recorrido). Expõe os fundamentos e cita NO MÁXIMO 5 acórdãos que a sustentam.
+       - Se houver mais de 5 documentos para uma posição, escolhe os 5 mais recentes ou relevantes.
 
-    REGRAS:
-    - Usa apenas a informação do contexto.
-    - Se não houver divergência, responde diretamente mas mantém o formato de citação com a (ref: ID).
-    - Não listes acórdãos que não uses na fundamentação.
+    2. SE NÃO HOUVER DIVERGÊNCIA:
+       - Responde de forma direta e fundamentada, citando os acórdãos mais relevantes (limite total de 10 citações).
+
+    REGRA DE CITAÇÃO (CRÍTICA):
+    Para cada acórdão citado, deves obrigatoriamente incluir a referência no final da frase no seguinte formato:
+    "Texto do fundamento... [Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
+    
+    Exemplo: "...conforme decidido por Antunes Ferreira, Proc. 44/22, 10-05-2023 (ref: 550e8400-e29b-41d4-a716-446655440000)"
+
+    IMPORTANTE:
+    - Não inventes acórdãos. Usa apenas os fornecidos no contexto.
+    - O número total de acórdãos analisados será exibido pelo sistema, por isso não precisas de os listar no fim.
+    - Sê técnico, preciso e utiliza terminologia jurídica portuguesa.
   `;
 
   const prompt = `
-    CONTEXTO DOS ACÓRDÃOS ANALISADOS (${context.length} documentos):
+    CONTEXTO DE ACÓRDÃOS DISPONÍVEIS (${context.length} documentos):
     ${relevantContext}
 
-    PERGUNTA:
+    QUESTÃO DO UTILIZADOR:
     ${question}
   `;
 
@@ -46,14 +52,14 @@ export const generateLegalAnswer = async (
       contents: prompt,
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.2,
+        temperature: 0.1, // Temperatura baixa para maior fidelidade jurídica
       }
     });
 
-    return response.text || "Não foi possível gerar uma resposta.";
+    return response.text || "Não foi possível obter uma análise para esta questão.";
   } catch (error) {
     console.error("Gemini Error:", error);
-    throw new Error("Erro ao comunicar com a IA.");
+    throw new Error("Falha na comunicação com o assistente jurídico local.");
   }
 };
 
