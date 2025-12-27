@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, Settings } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -29,12 +29,14 @@ function App() {
 
   useEffect(() => {
     const checkKey = async () => {
-      if (window.aistudio) {
+      // @ts-ignore
+      if (window.aistudio?.hasSelectedApiKey) {
         try {
+          // @ts-ignore
           const selected = await window.aistudio.hasSelectedApiKey();
           setHasUserKey(selected);
         } catch (e) {
-          console.warn("AI Studio key check failed", e);
+          console.warn("Verificação de API Key indisponível.");
         }
       }
     };
@@ -42,16 +44,18 @@ function App() {
   }, []);
 
   const handleConfigKey = async () => {
-    if (window.aistudio) {
+    // @ts-ignore
+    if (window.aistudio?.openSelectKey) {
       try {
+        // @ts-ignore
         await window.aistudio.openSelectKey();
-        // Após abrir o diálogo, assumimos sucesso para atualizar a UI
+        // Assumimos verdadeiro após abrir o seletor para que a UI mude
         setHasUserKey(true);
       } catch (e) {
-        console.error("Failed to open key selector", e);
+        console.error("Falha ao abrir seletor de chaves:", e);
       }
     } else {
-      alert("O seletor de chaves nativo não está disponível neste ambiente.");
+      alert("A funcionalidade de configuração de chave pessoal não está disponível neste ambiente. O sistema continuará a utilizar a chave gratuita por defeito.");
     }
   };
 
@@ -118,26 +122,31 @@ function App() {
         if (parsed.db) setDb(prev => [...prev, ...parsed.db.filter((x:any) => !prev.find(p=>p.id===x.id))]);
         if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
         if (parsed.chatSessions) setChatSessions(parsed.chatSessions);
-        alert('Base de dados carregada!');
+        alert('Base de dados carregada com sucesso!');
         setActiveTab('search');
-      } catch (err) { alert('Erro ao ler JSON.'); }
+      } catch (err) { alert('Erro ao carregar ficheiro JSON.'); }
     };
     reader.readAsText(file);
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
+    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans selection:bg-legal-100">
       {!legalArea && (
-          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-full text-center">
-                  <div className="mb-6 flex justify-center"><div className="p-4 bg-legal-100 rounded-full"><ScaleIcon className="w-10 h-10 text-legal-700"/></div></div>
-                  <h2 className="text-2xl font-bold mb-2">Bem-vindo à JurisAnalítica</h2>
-                  <p className="text-gray-600 mb-8">Selecione a sua área de jurisdição preferencial.</p>
+          <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-md">
+              <div className="bg-white rounded-[40px] shadow-2xl p-12 max-w-xl w-full text-center animate-in zoom-in-95 duration-500">
+                  <div className="mb-8 flex justify-center"><div className="p-6 bg-legal-50 rounded-[30px]"><ScaleIcon className="w-12 h-12 text-legal-700"/></div></div>
+                  <h2 className="text-3xl font-black mb-2 tracking-tighter">JurisAnalítica</h2>
+                  <p className="text-gray-500 mb-10 font-medium">Selecione a jurisdição para configurar o motor de IA.</p>
                   <div className="grid grid-cols-1 gap-4">
                       {['social', 'crime', 'civil'].map((area: any) => (
-                        <button key={area} onClick={() => setLegalArea(area)} className="p-4 rounded-lg border-2 border-legal-200 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-4 text-left">
-                           {area === 'social' ? <Briefcase className="w-6 h-6"/> : area === 'crime' ? <Gavel className="w-6 h-6"/> : <ScaleIcon className="w-6 h-6"/>}
-                           <div className="capitalize font-bold text-lg">Área {area}</div>
+                        <button key={area} onClick={() => setLegalArea(area)} className="group p-6 rounded-3xl border-2 border-gray-100 hover:border-legal-600 hover:bg-legal-50 transition-all flex items-center gap-5 text-left shadow-sm hover:shadow-xl active:scale-95">
+                           <div className="p-3 bg-white rounded-2xl border border-gray-100 group-hover:border-legal-200 transition-all shadow-sm">
+                            {area === 'social' ? <Briefcase className="w-7 h-7 text-legal-600"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-legal-600"/> : <ScaleIcon className="w-7 h-7 text-legal-600"/>}
+                           </div>
+                           <div>
+                               <div className="capitalize font-black text-xl text-gray-800 tracking-tight">Área {area}</div>
+                               <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Configurar Descritores Automáticos</div>
+                           </div>
                         </button>
                       ))}
                   </div>
@@ -145,30 +154,34 @@ function App() {
           </div>
       )}
 
-      <header className="bg-legal-900 text-white shadow-md z-50 flex-shrink-0">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scale className="w-8 h-8 text-legal-200" />
+      <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
+        <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="p-2.5 bg-legal-800 rounded-2xl border border-legal-700 shadow-inner">
+                <Scale className="w-8 h-8 text-legal-100" />
+            </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">JurisAnalítica</h1>
-              <p className="text-[9px] text-legal-300 uppercase tracking-widest font-bold">Privacidade Total • {legalArea}</p>
+              <h1 className="text-2xl font-black tracking-tighter leading-none">JurisAnalítica</h1>
+              <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black mt-1">Análise Local • {legalArea}</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button 
               onClick={handleConfigKey} 
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-tighter transition-all shadow-sm ${hasUserKey ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-legal-700 text-legal-200 hover:bg-legal-600 border border-legal-600'}`}
+              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 border-2 ${hasUserKey ? 'bg-green-600 text-white border-green-500' : 'bg-legal-800 text-legal-200 border-legal-700 hover:border-legal-500 hover:bg-legal-700'}`}
               title="Configurar a sua própria API Key para usar saldo pessoal."
             >
-              <Key className="w-3.5 h-3.5" />
-              {hasUserKey ? 'Chave Ativa' : 'Configurar API Key'}
+              <Key className="w-4 h-4" />
+              {hasUserKey ? 'Key: Pessoal' : 'Configurar API'}
             </button>
-            <div className="h-6 w-px bg-legal-700"></div>
+            
+            <div className="h-10 w-px bg-legal-700 opacity-30"></div>
+            
             <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
-            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-bold uppercase tracking-tighter text-legal-300 hover:text-white transition-colors">Carregar</button>
-            <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-1.5 bg-green-600 hover:bg-green-700 rounded-lg text-xs font-bold shadow-sm transition-all active:scale-95">
-              <Save className="w-4 h-4" /> Guardar Backup
+            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all">Importar</button>
+            <button onClick={handleSaveDb} className="flex items-center gap-2.5 px-6 py-3 bg-white text-legal-900 hover:bg-legal-100 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
+              <Save className="w-4 h-4" /> Exportar Backup
             </button>
           </div>
         </div>
@@ -189,10 +202,10 @@ function App() {
           />
         ) : (
           <>
-            <div className="bg-white border-b px-6 pt-2 flex gap-6 flex-shrink-0 shadow-sm z-10">
+            <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
                {['process', 'search', 'chat'].map((tab: any) => (
-                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-2 px-1 text-sm font-bold border-b-2 transition-all capitalize tracking-tight ${activeTab === tab ? 'border-legal-600 text-legal-800' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                    {tab === 'process' ? '⚙️ Processamento' : tab === 'search' ? '🔍 Biblioteca' : '💬 Consultoria'}
+                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                    {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
                  </button>
                ))}
             </div>
