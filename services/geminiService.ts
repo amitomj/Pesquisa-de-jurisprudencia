@@ -1,80 +1,63 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
+
+// Função auxiliar para gerir erros de chave
+const handleAIError = async (error: any) => {
+  console.error("Gemini Error:", error);
+  if (error.message?.includes("Requested entity was not found")) {
+    alert("A sua API Key parece ser inválida ou expirou. Por favor, selecione-a novamente.");
+    if (window.aistudio) await window.aistudio.openSelectKey();
+    throw new Error("API Key inválida. Por favor, tente novamente após reconfigurar.");
+  }
+  throw error;
+};
 
 export const generateLegalAnswer = async (
   question: string,
   context: Acordao[]
 ): Promise<string> => {
+  // Cria nova instância para garantir uso da chave atualizada no process.env.API_KEY
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  // Prepara o contexto, limitando para evitar exceder tokens, mas mantendo o ID vital para o UI
   const relevantContext = context.map(c => 
     `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 800)}...`
   ).join('\n---\n');
 
   const systemPrompt = `
-    És um consultor jurídico sénior em Portugal, especializado em análise de jurisprudência.
+    És um consultor jurídico sénior em Portugal. Analisa os acórdãos e identifica correntes jurisprudenciais.
     
-    ESTRUTURA DA RESPOSTA:
-    Analisa os acórdãos fornecidos e verifica se existe uma corrente jurisprudencial uniforme ou se há divergência.
-
-    1. SE HOUVER DIVERGÊNCIA (Correntes Opostas):
-       - Identifica a "Posição A" (ex: Corrente Majoritária ou Acórdão Fundamento). Expõe os fundamentos e cita NO MÁXIMO 5 acórdãos que a sustentam.
-       - Identifica a "Posição B" (ex: Corrente Minoritária ou Acórdão Recorrido). Expõe os fundamentos e cita NO MÁXIMO 5 acórdãos que a sustentam.
-       - Se houver mais de 5 documentos para uma posição, escolhe os 5 mais recentes ou relevantes.
-
+    1. SE HOUVER DIVERGÊNCIA:
+       - Identifica "Posição A" e "Posição B", citando até 5 acórdãos para cada (os mais recentes).
     2. SE NÃO HOUVER DIVERGÊNCIA:
-       - Responde de forma direta e fundamentada, citando os acórdãos mais relevantes (limite total de 10 citações).
+       - Responde de forma fundamentada citando os mais relevantes.
 
-    REGRA DE CITAÇÃO (CRÍTICA):
-    Para cada acórdão citado, deves obrigatoriamente incluir a referência no final da frase no seguinte formato:
-    "Texto do fundamento... [Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
-    
-    Exemplo: "...conforme decidido por Antunes Ferreira, Proc. 44/22, 10-05-2023 (ref: 550e8400-e29b-41d4-a716-446655440000)"
-
-    IMPORTANTE:
-    - Não inventes acórdãos. Usa apenas os fornecidos no contexto.
-    - O número total de acórdãos analisados será exibido pelo sistema, por isso não precisas de os listar no fim.
-    - Sê técnico, preciso e utiliza terminologia jurídica portuguesa.
-  `;
-
-  const prompt = `
-    CONTEXTO DE ACÓRDÃOS DISPONÍVEIS (${context.length} documentos):
-    ${relevantContext}
-
-    QUESTÃO DO UTILIZADOR:
-    ${question}
+    FORMATO DE CITAÇÃO: "[Relator], Proc. [Numero], [Data] (ref: [ID_REF])"
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash", 
-      contents: prompt,
+      model: "gemini-3-pro-preview", // Modelo superior para análise complexa
+      contents: `CONTEXTO (${context.length} docs):\n${relevantContext}\n\nQUESTÃO: ${question}`,
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.1, // Temperatura baixa para maior fidelidade jurídica
+        temperature: 0.1,
+        thinkingConfig: { thinkingBudget: 4000 } // Ativa raciocínio detalhado
       }
     });
 
-    return response.text || "Não foi possível obter uma análise para esta questão.";
+    return response.text || "Sem resposta.";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    throw new Error("Falha na comunicação com o assistente jurídico local.");
+    return handleAIError(error);
   }
 };
 
-export const extractMetadataWithAI = async (textContext: string): Promise<{
-  data?: string;
-  relator?: string;
-  adjuntos?: string[];
-  sumario?: string;
-}> => {
+export const extractMetadataWithAI = async (textContext: string): Promise<any> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Extrai JSON: data (DD-MM-AAAA), relator, adjuntos (array), sumario.\nTEXTO:\n${textContext}`;
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
+      model: "gemini-3-flash-preview",
+      contents: `Extrai JSON: data (DD-MM-AAAA), relator, adjuntos (array), sumario.\nTEXTO:\n${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -94,11 +77,10 @@ export const extractMetadataWithAI = async (textContext: string): Promise<{
 
 export const suggestDescriptorsWithAI = async (summary: string, validDescriptors: string[]): Promise<string[]> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  const prompt = `Escolhe da lista os descritores para o sumário. Retorna array JSON. Se incerto, prefixa com *.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`;
   try {
      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
+        model: "gemini-3-flash-preview",
+        contents: `Escolhe descritores.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
