@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Acordao, SearchFilters, SearchResult } from '../types';
-import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck, Tag, Eraser, AlignLeft, Plus, Trash2 } from 'lucide-react';
+import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Loader2, AlertCircle, Check, CircleHelp, UserCheck, Tag, Eraser, AlignLeft, Plus, Zap } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const parseDate = (dateStr: string): number => {
@@ -183,6 +183,7 @@ const SearchModule: React.FC<Props> = ({
               if (aiResult.data) updated.data = aiResult.data;
               if (aiResult.relator) updated.relator = aiResult.relator;
               if (aiResult.adjuntos) updated.adjuntos = aiResult.adjuntos.filter((a:string)=>a!=='N/D');
+              if (aiResult.descritores) updated.descritores = aiResult.descritores.filter((d:string)=>d!=='N/D');
           }
           if (mode === 'full' || mode === 'sumario') {
               if (aiResult.sumario && aiResult.sumario.length > 50) updated.sumario = aiResult.sumario;
@@ -271,11 +272,11 @@ const SearchModule: React.FC<Props> = ({
               </div>
               <button 
                 onClick={handleResetFilters}
-                className="p-2 hover:bg-gray-200 rounded-xl text-gray-400 hover:text-red-600 transition-all flex items-center gap-1.5 group"
-                title="Limpar todos os filtros"
+                className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-xl transition-all flex items-center gap-1.5 group border border-red-100 shadow-sm"
+                title="Limpar todos os filtros e recuperar tudo"
               >
                 <Eraser className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-widest hidden group-hover:inline">Reset</span>
+                <span className="text-[9px] font-black uppercase tracking-widest">Limpar</span>
               </button>
           </div>
           
@@ -297,9 +298,9 @@ const SearchModule: React.FC<Props> = ({
                             </div>
                         </button>
                         {showMissingSummary && results.length > 0 && (
-                            <button onClick={() => processInBulk('sumario')} disabled={isProcessingBulk} className="w-full mt-1 bg-orange-100 text-orange-700 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-200 transition-all">
+                            <button onClick={() => processInBulk('sumario')} disabled={isProcessingBulk} className="w-full mt-1 bg-orange-600 text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-700 transition-all shadow-md animate-pulse">
                                 {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin"/> : <Zap className="w-3 h-3"/>}
-                                Corrigir Todos (IA)
+                                Corrigir Sumários via IA
                             </button>
                         )}
                     </div>
@@ -315,9 +316,9 @@ const SearchModule: React.FC<Props> = ({
                             </div>
                         </button>
                         {showMissingData && results.length > 0 && (
-                            <button onClick={() => processInBulk('dados')} disabled={isProcessingBulk} className="w-full mt-1 bg-blue-100 text-blue-700 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-200 transition-all">
+                            <button onClick={() => processInBulk('dados')} disabled={isProcessingBulk} className="w-full mt-1 bg-blue-600 text-white py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all shadow-md animate-pulse">
                                 {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin"/> : <Zap className="w-3 h-3"/>}
-                                Corrigir Todos (IA)
+                                Corrigir Metadados via IA
                             </button>
                         )}
                     </div>
@@ -376,7 +377,7 @@ const SearchModule: React.FC<Props> = ({
                 <div className="h-full flex flex-col items-center justify-center text-gray-300">
                     <div className="p-8 bg-white rounded-full shadow-inner mb-6 opacity-30"><Search className="w-20 h-20" /></div>
                     <p className="font-black text-sm uppercase tracking-widest">Nenhum acórdão encontrado</p>
-                    <button onClick={handleResetFilters} className="mt-4 text-legal-600 font-black text-[10px] uppercase tracking-widest hover:underline">Limpar Filtros</button>
+                    <button onClick={handleResetFilters} className="mt-4 text-legal-600 font-black text-[10px] uppercase tracking-widest hover:underline">Recuperar Todos</button>
                 </div>
             ) : (
                 displayedResults.map(item => {

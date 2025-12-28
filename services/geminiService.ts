@@ -2,13 +2,11 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-// Função para obter uma instância fresca do cliente com a chave atualizada
 const getAIInstance = () => {
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined") {
     throw new Error("API_KEY_NOT_SET");
   }
-  // Criação de nova instância em cada pedido conforme as diretrizes
   return new GoogleGenAI({ apiKey });
 };
 
@@ -53,10 +51,11 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
       model: "gemini-3-flash-preview",
       contents: `Analisa o texto do acórdão e extrai rigorosamente os metadados em JSON.
 REGRAS:
-1. SUMÁRIO: Extrai o texto INTEGRAL e COMPLETO do sumário. Não resumas.
-2. DATA: Identifica a data da decisão (DD-MM-AAAA).
-3. MAGISTRADOS: Identifica o Juiz Relator e os Juízes Adjuntos.
-4. Se um campo não for encontrado, usa "N/D".
+1. SUMÁRIO: Texto integral do sumário jurisprudencial.
+2. DATA: Data da decisão (DD-MM-AAAA).
+3. MAGISTRADOS: Nome do Relator e nomes dos Adjuntos.
+4. DESCRITORES: Identifica os 3 a 5 temas ou descritores jurídicos principais (tags) relevantes para o caso.
+5. Se um campo não for encontrado, usa "N/D".
 
 TEXTO:
 ${textContext}`,
@@ -68,9 +67,10 @@ ${textContext}`,
             data: { type: Type.STRING },
             relator: { type: Type.STRING },
             adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            sumario: { type: Type.STRING }
+            sumario: { type: Type.STRING },
+            descritores: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["data", "relator", "adjuntos", "sumario"]
+          required: ["data", "relator", "adjuntos", "sumario", "descritores"]
         }
       }
     });

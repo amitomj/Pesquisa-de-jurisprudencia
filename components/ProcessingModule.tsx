@@ -2,8 +2,8 @@
 import React, { useState, useRef } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
-import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
-import { FolderUp, CheckCircle, AlertCircle, RefreshCw, FilePlus, UserPlus, Tag, Bot, Users, ArrowRight, Loader2, Info, Square, XCircle } from 'lucide-react';
+import { extractMetadataWithAI } from '../services/geminiService';
+import { FolderUp, CheckCircle, RefreshCw, FilePlus, Bot, XCircle, ArrowRight, Users, Info, Loader2 } from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
@@ -25,12 +25,8 @@ const ProcessingModule: React.FC<Props> = ({
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [showLegacyFallback, setShowLegacyFallback] = useState(false);
-  
   const stopRequested = useRef(false);
 
-  const [judgeInput, setJudgeInput] = useState('');
-  const [descriptorInput, setDescriptorInput] = useState('');
-  const [descriptorCategory, setDescriptorCategory] = useState<'social' | 'crime' | 'civil'>('social');
   const [mergeMain, setMergeMain] = useState('');
   const [mergeSecondary, setMergeSecondary] = useState('');
   const legacyInputRef = useRef<HTMLInputElement>(null);
@@ -78,11 +74,11 @@ const ProcessingModule: React.FC<Props> = ({
         let data = await extractDataFromPdf(file);
         const isDataMissing = data.relator === 'Desconhecido' || data.data === 'N/D';
         const isSumarioMissing = data.sumario.includes('Sumário não identificado');
+        const isTagsMissing = !data.descritores || data.descritores.length === 0;
 
-        if (isDataMissing || isSumarioMissing) {
+        if (isDataMissing || isSumarioMissing || isTagsMissing) {
             try {
                 const textLen = data.textoCompleto.length;
-                // Aumentamos a janela de contexto para a IA ver o sumário integral
                 const context = textLen < 15000 
                     ? data.textoCompleto 
                     : data.textoCompleto.substring(0, 8000) + "\n...[EXCERTO JURISPRUDENCIAL]...\n" + data.textoCompleto.substring(textLen - 6000);
@@ -91,9 +87,12 @@ const ProcessingModule: React.FC<Props> = ({
                 if (aiResult) {
                     if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
                     if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
-                    if (aiResult.adjuntos && aiResult.adjuntos.length > 0) data.adjuntos = aiResult.adjuntos;
+                    if (aiResult.adjuntos && aiResult.adjuntos.length > 0) data.adjuntos = aiResult.adjuntos.filter((a:string)=>a!=='N/D');
                     if (aiResult.sumario && aiResult.sumario.length > 50) data.sumario = aiResult.sumario;
-                    setLogs(prev => [...prev, `✨ Metadados otimizados via IA para ${file.name}`]);
+                    if (aiResult.descritores && aiResult.descritores.length > 0) {
+                        data.descritores = aiResult.descritores.filter((d:string)=>d!=='N/D');
+                    }
+                    setLogs(prev => [...prev, `✨ Metadados e Descritores otimizados via IA para ${file.name}`]);
                 }
             } catch (aiError) {}
         }
@@ -127,7 +126,6 @@ const ProcessingModule: React.FC<Props> = ({
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-500 relative h-full overflow-y-auto custom-scrollbar">
-      
       {processing && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex flex-col items-center justify-center backdrop-blur-md">
            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full text-center border-t-8 border-legal-600">
@@ -137,9 +135,8 @@ const ProcessingModule: React.FC<Props> = ({
               </div>
               <div>
                 <h3 className="text-xl font-black text-legal-900 uppercase tracking-tight">Análise em Curso</h3>
-                <p className="text-gray-400 text-[10px] font-bold mt-1 uppercase tracking-widest">A ler e extrair sumários integrais...</p>
+                <p className="text-gray-400 text-[10px] font-bold mt-1 uppercase tracking-widest">Extraindo sumários e descritores...</p>
               </div>
-              
               <button 
                 onClick={() => { stopRequested.current = true; }} 
                 className="mt-4 flex items-center gap-2 bg-red-600 text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-red-700 transition-all active:scale-95 shadow-xl shadow-red-500/20"
@@ -182,11 +179,9 @@ const ProcessingModule: React.FC<Props> = ({
               </div>
             </div>
         )}
-        {/* Fix: Added explicit typing for event and ensured results from Array.from are treated as File[] to resolve 'unknown' errors */}
         <input type="file" ref={legacyInputRef} className="hidden" onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             const fileList = e.target.files;
             if (!fileList) return;
-            // Use type assertion to ensure Array.from returns File[] from FileList to avoid 'unknown' type errors
             const files = (Array.from(fileList) as File[]).filter(f => f.name.toLowerCase().endsWith('.pdf'));
             if (files.length > 0) { 
               setProcessing(true); 
@@ -212,23 +207,20 @@ const ProcessingModule: React.FC<Props> = ({
         </div>
       )}
 
-      {/* Management components remain same as previously functional version */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 col-span-1 md:col-span-2">
-               <h3 className="text-sm font-black text-legal-900 mb-6 flex items-center gap-2 uppercase tracking-widest"><Users className="w-5 h-5 text-legal-600"/> Padronização de Magistrados</h3>
-               <div className="flex flex-col md:flex-row gap-4 items-end bg-gray-50 p-6 rounded-3xl border border-gray-100">
-                   <div className="flex-1 w-full">
-                       <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest px-1">Nome no Documento</label>
-                       <input list="judges-list" className="w-full p-3.5 border border-gray-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-legal-50" placeholder="Ex: J. Silva..." value={mergeSecondary} onChange={e => setMergeSecondary(e.target.value)} />
-                   </div>
-                   <div className="flex items-center justify-center mb-3"><ArrowRight className="w-5 h-5 text-gray-300" /></div>
-                   <div className="flex-1 w-full">
-                       <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest px-1">Nome Padronizado</label>
-                       <input list="judges-list" className="w-full p-3.5 border border-gray-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-legal-50" placeholder="Ex: João Silva..." value={mergeMain} onChange={e => setMergeMain(e.target.value)} />
-                   </div>
-                   <button onClick={() => { if(onMergeJudges && mergeMain && mergeSecondary) { onMergeJudges(mergeMain, [mergeSecondary]); setMergeSecondary(''); } }} disabled={!mergeMain.trim() || !mergeSecondary.trim()} className="bg-legal-900 text-white px-8 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Unificar</button>
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 col-span-1 md:col-span-2">
+           <h3 className="text-sm font-black text-legal-900 mb-6 flex items-center gap-2 uppercase tracking-widest"><Users className="w-5 h-5 text-legal-600"/> Padronização de Magistrados</h3>
+           <div className="flex flex-col md:flex-row gap-4 items-end bg-gray-50 p-6 rounded-3xl border border-gray-100">
+               <div className="flex-1 w-full">
+                   <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest px-1">Nome no Documento</label>
+                   <input list="judges-list" className="w-full p-3.5 border border-gray-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-legal-50" placeholder="Ex: J. Silva..." value={mergeSecondary} onChange={e => setMergeSecondary(e.target.value)} />
                </div>
-          </div>
+               <div className="flex items-center justify-center mb-3"><ArrowRight className="w-5 h-5 text-gray-300" /></div>
+               <div className="flex-1 w-full">
+                   <label className="text-[9px] font-black text-gray-400 uppercase mb-2 block tracking-widest px-1">Nome Padronizado</label>
+                   <input list="judges-list" className="w-full p-3.5 border border-gray-200 rounded-2xl text-xs font-bold outline-none focus:ring-4 focus:ring-legal-50" placeholder="Ex: João Silva..." value={mergeMain} onChange={e => setMergeMain(e.target.value)} />
+               </div>
+               <button onClick={() => { if(onMergeJudges && mergeMain && mergeSecondary) { onMergeJudges(mergeMain, [mergeSecondary]); setMergeSecondary(''); } }} disabled={!mergeMain.trim() || !mergeSecondary.trim()} className="bg-legal-900 text-white px-8 py-3.5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Unificar</button>
+           </div>
       </div>
     </div>
   );

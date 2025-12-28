@@ -26,10 +26,8 @@ function App() {
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Verificação constante da chave de API conforme orientações
   useEffect(() => {
     const checkKey = async () => {
       try {
@@ -38,15 +36,15 @@ function App() {
           const has = await window.aistudio.hasSelectedApiKey();
           setHasApiKey(has);
         } else {
-          // Fallback check se a chave foi injetada mas o aistudio object não está presente em certos contextos
-          setHasApiKey(!!process.env.API_KEY && process.env.API_KEY !== 'undefined');
+          // Fallback check se a chave foi injetada mas o aistudio object não está presente
+          setHasApiKey(!!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY.length > 10);
         }
       } catch (e) {
         setHasApiKey(false);
       }
     };
     checkKey();
-    const interval = setInterval(checkKey, 1000); // Frequência aumentada para 1s
+    const interval = setInterval(checkKey, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -55,10 +53,9 @@ function App() {
       // @ts-ignore
       if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
         await window.aistudio.openSelectKey();
-        // Conforme as regras de race condition, assumimos sucesso após o trigger
-        setHasApiKey(true);
+        setHasApiKey(true); // Assume sucesso conforme guia
       } else {
-        console.warn("Ambiente AI Studio não detetado para seleção de chave.");
+        alert("Ambiente de configuração de chave não detetado. Certifique-se que está a usar o ambiente adequado.");
       }
     } catch (e) {
       console.error("Erro ao abrir seletor de chave:", e);
@@ -175,7 +172,6 @@ function App() {
             </div>
             <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">Área Jurídica</h2>
             <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
-            
             <div className="grid grid-cols-1 gap-4">
               {['social', 'crime', 'civil'].map((area: any) => (
                 <button 
@@ -230,9 +226,7 @@ function App() {
               {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <AlertTriangle className="w-4 h-4"/>}
               {hasApiKey ? 'IA Ativa' : 'Configurar IA'}
             </button>
-
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-1"></div>
-            
             <div className="flex bg-legal-800 rounded-2xl p-1 gap-1">
               <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 hover:bg-legal-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-legal-100" title="Carregar Backup JSON">
                 <FolderOpen className="w-4 h-4" /> Importar
