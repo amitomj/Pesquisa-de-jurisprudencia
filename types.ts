@@ -1,6 +1,5 @@
 
 
-
 export interface Acordao {
   id: string;
   processo: string;
@@ -50,22 +49,21 @@ export interface SearchResult {
   date: number;
 }
 
-declare global {
-  // Interface representing the AI Studio environment controls.
-  // Moved inside declare global to fix "Subsequent property declarations must have the same type" 
-  // and resolve identity mismatches between local and global scope.
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
+// Interface representing the AI Studio environment controls.
+// Defined outside declare global to allow standard export and resolve "Cannot export 'AIStudio'" error.
+export interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
 
+declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
     /**
      * aistudio property is injected by the environment.
-     * Removed 'readonly' modifier to fix the "All declarations of 'aistudio' must have identical modifiers" error.
+     * Added 'readonly' back to match the mandatory modifiers of the ambient environment declaration.
      */
-    aistudio: AIStudio;
+    readonly aistudio: AIStudio;
   }
 }

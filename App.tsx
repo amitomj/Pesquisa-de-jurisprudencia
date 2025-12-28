@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -263,10 +263,11 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   
-  // BYOK State - Bring Your Own Key
+  // Detecção de estado da IA
   const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
+  const [aiMode, setAiMode] = useState<'system' | 'personal' | 'none'>('none');
   
-  const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
+  const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
@@ -277,28 +278,45 @@ function App() {
 
   useEffect(() => {
     const checkAiKey = async () => {
+      // 1. Prioridade: Chave de Sistema (Vercel Env Var)
+      if (process.env.API_KEY) {
+        setIsAiConfigured(true);
+        setAiMode('system');
+        return;
+      }
+
+      // 2. Alternativa: Chave Pessoal (Google AI Studio Context)
       if (window.aistudio) {
         try {
           const hasKey = await window.aistudio.hasSelectedApiKey();
-          setIsAiConfigured(hasKey);
-          if (hasKey && onboardingStep === 'key') setOnboardingStep('area');
+          if (hasKey) {
+            setIsAiConfigured(true);
+            setAiMode('personal');
+          }
         } catch (e) {
-          console.debug("AI Studio context not available");
+          console.debug("Verificação de chave AI Studio ignorada");
         }
       }
     };
     checkAiKey();
-  }, [onboardingStep]);
+  }, []);
 
   const handleOpenAiKeyDialog = async () => {
+    if (aiMode === 'system') {
+        alert("A IA está configurada via Variável de Ambiente (Vercel). Esta é a configuração mais segura para deployments privados.");
+        return;
+    }
+
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
         setIsAiConfigured(true);
-        if (onboardingStep === 'key') setOnboardingStep('area');
+        setAiMode('personal');
       } catch (e) {
         console.error("Falha ao abrir seletor de chaves");
       }
+    } else {
+        alert("Configuração Vercel:\n\nPara usar a sua chave privada e ser o único a utilizá-la:\n1. Vá ao Vercel -> Settings -> Environment Variables\n2. Adicione 'API_KEY' com o valor da sua chave.\n3. Faça Redeploy.\n\nPara garantir que só você acede ao site, ative o 'Deployment Protection' nas definições do Vercel.");
     }
   };
 
@@ -419,7 +437,7 @@ function App() {
             if (parsed.descriptors.civil) merged.civil = Array.from(new Set([...descriptors.civil, ...parsed.descriptors.civil])).sort();
             setDescriptors(merged);
         }
-        if (onboardingStep !== 'key') setOnboardingStep('app');
+        setOnboardingStep('app');
       } catch (err) {
         alert("Erro ao ler ficheiro de backup jurídico.");
       }
@@ -451,44 +469,6 @@ function App() {
     e.target.value = '';
   };
 
-  if (onboardingStep === 'key') {
-    return (
-      <div className="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
-        <div className="bg-slate-900 rounded-[32px] shadow-2xl p-12 max-w-[600px] w-full text-center border border-slate-800 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600"></div>
-            <div className="mb-10 flex justify-center">
-              <div className="p-8 bg-blue-500/10 rounded-full border border-blue-500/20">
-                <ShieldCheck className="w-12 h-12 text-blue-400"/>
-              </div>
-            </div>
-            <h2 className="text-3xl font-black mb-4 tracking-tighter text-white uppercase">Ligação Segura à IA</h2>
-            <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-                Esta aplicação funciona no modelo <strong>Faturamento Individual (BYOK)</strong>. 
-                Os seus documentos nunca saem deste browser, mas para que a IA os analise, 
-                precisa de ligar a sua própria conta paga da Google Cloud/AI Studio.
-            </p>
-            <div className="space-y-4">
-                <button 
-                    onClick={handleOpenAiKeyDialog} 
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-6 rounded-[20px] font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3"
-                >
-                    <Globe className="w-5 h-5"/> Ligar a minha Conta Google (IA Studio)
-                </button>
-                <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl text-left border border-slate-700/50">
-                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                        Ao clicar, será aberto um diálogo oficial da Google. Pode revogar este acesso a qualquer momento.
-                        <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-blue-500 ml-1 underline flex items-center gap-1 mt-1">
-                            Consultar Custos da Google <ExternalLink className="w-3 h-3"/>
-                        </a>
-                    </p>
-                </div>
-            </div>
-        </div>
-      </div>
-    );
-  }
-
   const mainContent = onboardingStep === 'app' ? (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
@@ -504,11 +484,11 @@ function App() {
             
             <button 
                 onClick={handleOpenAiKeyDialog}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}
-                title="Sua chave pessoal Google AI Studio"
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400 animate-pulse'}`}
+                title={aiMode === 'system' ? "Configurado via Vercel (Seguro)" : "Clique para configurar chave pessoal"}
             >
-                {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConfigured ? 'Faturamento Pessoal Ativo' : 'Ligar IA Pessoal'}
+                {aiMode === 'system' ? <Lock className="w-4 h-4" /> : isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                {aiMode === 'system' ? 'IA Sistema Pronta' : isAiConfigured ? 'IA Pessoal Ativa' : 'Ligar IA Pessoal'}
             </button>
 
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
@@ -533,6 +513,17 @@ function App() {
           </div>
         </div>
       </header>
+
+      {!isAiConfigured && (
+          <div className="bg-orange-50 border-b border-orange-100 p-2 flex items-center justify-center gap-3 animate-in slide-in-from-top-4">
+              <AlertCircle className="w-4 h-4 text-orange-600" />
+              <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">
+                  A IA não está configurada. A análise automática requer uma chave API ativa.
+                  <span className="mx-2 opacity-30">|</span>
+                  <button onClick={handleOpenAiKeyDialog} className="underline font-black hover:text-orange-900">Configurar Chave</button>
+              </p>
+          </div>
+      )}
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
@@ -626,6 +617,17 @@ function App() {
                 <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
                     <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Histórico Chat
                 </button>
+            </div>
+            
+            <div className="mt-6 p-4 bg-slate-900/50 rounded-2xl border border-slate-700/50 text-left">
+                <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-3 h-3 text-blue-400"/>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Segurança de Dados</span>
+                </div>
+                <p className="text-[9px] text-slate-500 leading-relaxed font-bold uppercase">
+                    Esta aplicação é centrada na privacidade. Os seus documentos PDF nunca saem do seu computador. Apenas o texto estritamente necessário é enviado para a IA (Google) para processamento.
+                    {aiMode === 'system' && <span className="block mt-1 text-green-500/80"><ShieldCheck className="inline w-2.5 h-2.5 mr-1"/> Modo Seguro (Chave de Sistema) Ativo.</span>}
+                </p>
             </div>
           </div>
       </div>
