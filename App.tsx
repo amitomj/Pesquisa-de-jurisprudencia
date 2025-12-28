@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2 } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -262,6 +262,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -270,6 +271,27 @@ function App() {
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
+  };
+
+  useEffect(() => {
+    const checkAiKey = async () => {
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setIsAiConfigured(hasKey);
+      } else if (process.env.API_KEY) {
+        setIsAiConfigured(true);
+      }
+    };
+    checkAiKey();
+  }, []);
+
+  const handleOpenAiKeyDialog = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      setIsAiConfigured(true);
+    } else {
+        alert("Configuração de chave individual requer um ambiente compatível. No Vercel, utilize a configuração de variáveis de ambiente se for o proprietário, ou execute localmente.");
+    }
   };
 
   useEffect(() => {
@@ -432,7 +454,17 @@ function App() {
               <p className="text-[9px] text-legal-400 uppercase tracking-widest font-black mt-1">Área {legalArea}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            
+            <button 
+                onClick={handleOpenAiKeyDialog}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400 animate-pulse'}`}
+                title="Configurar a sua própria chave API para IA"
+            >
+                {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                {isAiConfigured ? 'IA Pronta' : 'Ligar IA Pessoal'}
+            </button>
+
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
             
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
@@ -455,6 +487,17 @@ function App() {
           </div>
         </div>
       </header>
+
+      {!isAiConfigured && activeTab === 'chat' && (
+          <div className="bg-orange-50 border-b border-orange-100 p-2 flex items-center justify-center gap-3 animate-in fade-in">
+              <AlertCircle className="w-4 h-4 text-orange-600" />
+              <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">
+                  A IA não está configurada para esta sessão. Clique em <button onClick={handleOpenAiKeyDialog} className="underline font-black hover:text-orange-900">Ligar IA Pessoal</button> para começar.
+                  <span className="mx-2 opacity-30">|</span>
+                  <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline opacity-60">Info Faturação</a>
+              </p>
+          </div>
+      )}
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">

@@ -2,9 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-const handleApiError = (error: any) => {
+const handleApiError = async (error: any) => {
   console.error("Erro Gemini API:", error);
   const msg = error?.message || "";
+  
+  if (msg.includes("Requested entity was not found")) {
+      if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+          return "RETRY";
+      }
+  }
+
   if (msg.includes("429") || msg.toLowerCase().includes("quota exceeded") || msg.toLowerCase().includes("rate limit")) {
     return "API_LIMIT_REACHED";
   }
@@ -18,14 +26,12 @@ export const generateLegalAnswer = async (
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Otimizamos o contexto enviando a Fundamentação de Direito (textoAnalise)
-    // Se for muito longa, pegamos os primeiros 5000 caracteres de cada documento relevante
     const relevantContext = context.map(c => 
       `ID_REF: ${c.id}\nProcesso: ${c.processo}\nSumário: ${c.sumario}\nFUNDAMENTAÇÃO DE DIREITO: ${c.textoAnalise.substring(0, 8000)}...`
     ).join('\n---\n');
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-pro-preview",
+      model: 'gemini-3-pro-preview',
       contents: `És um assistente jurídico de alto nível. Analisa a FUNDAMENTAÇÃO DE DIREITO dos acórdãos fornecidos para responder à questão.
 
 REGRAS CRÍTICAS:
@@ -47,9 +53,10 @@ ${question}`,
 
     return response.text || "Sem resposta baseada no contexto.";
   } catch (error: any) {
-    const errType = handleApiError(error);
+    const errType = await handleApiError(error);
+    if (errType === "RETRY") return "A chave de IA expirou ou é inválida. Por favor, tente novamente após selecionar uma nova chave.";
     if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de API atingido. Aguarde um momento.";
-    return "Erro no processamento da IA.";
+    return "Erro no processamento da IA. Verifique se ligou a sua Chave API pessoal no cabeçalho.";
   }
 };
 
@@ -57,7 +64,7 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: 'gemini-3-flash-preview',
       contents: `Extrai metadados em JSON. 
       Foca-te em gerar um SUMÁRIO conciso mas juridicamente rico baseado na FUNDAMENTAÇÃO DE DIREITO fornecida.
       Escolhe 3-5 DESCRITORES desta lista: [${availableDescriptors.join(", ")}]
@@ -81,6 +88,9 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
+    // Return specific error constant for UI handling if quota is reached
+    const errType = await handleApiError(error);
+    if (errType === "API_LIMIT_REACHED") return "API_LIMIT_REACHED";
     return null; 
   }
 };
@@ -89,7 +99,7 @@ export const suggestDescriptorsWithAI = async (summary: string, availableDescrip
   try {
      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: 'gemini-3-flash-preview',
         contents: `Lista 6 descritores da lista abaixo para este sumário jurídico.
         LISTA: [${availableDescriptors.join(", ")}]
         SUMÁRIO: ${summary}`,

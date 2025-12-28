@@ -1,4 +1,5 @@
 
+
 export interface Acordao {
   id: string;
   processo: string;
@@ -17,7 +18,7 @@ export interface SearchFilters {
   processo: string;
   relator: string;
   adjunto: string;
-  descritores: string[]; // Alterado para array
+  descritores: string[]; 
   dataInicio: string;
   dataFim: string;
   booleanAnd: string;
@@ -48,9 +49,23 @@ export interface SearchResult {
   date: number;
 }
 
+/**
+ * Interface representing the AI Studio environment controls.
+ * Matches environmental global definitions to prevent type mismatch errors.
+ */
+export interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
 declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
+    /**
+     * aistudio property is often injected by the environment as a readonly property of type AIStudio.
+     * Fixing modifier mismatch by adding readonly and using the named AIStudio interface.
+     */
+    readonly aistudio: AIStudio;
   }
 }
