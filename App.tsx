@@ -183,7 +183,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Ordem escrita", "Ordem legítima", "Ordem pública internacional", "Órgãos de administração", "Órgãos de fiscalização",
   "Outsourcing", "Pacto de desaforamento", "Pacto de não concorrência", "Pacto de permanência", "Pacto privativo de jurisdição",
   "Pagamento", "Pagamento de retribuições intercalares pelo Estado", "Pagamento em prestações", "Parecer da CITE",
-  "Parecer do Instituto do Emprego e Formação Profissional", "Parecer do Ministério Público", "Parecer do Sindicato",
+  "Parecer do Instituto do Emprego e Formação Profimplamentaional", "Parecer do Ministério Público", "Parecer do Sindicato",
   "Parecer técnico", "Parentalidade", "Património autónomo", "Participação de acidente de trabalho", "Patrocínio oficioso",
   "Pedido", "Pedido de juros", "Pedido genérico", "Pedido principal", "Pedido subsidiário", "Pedidos alternativos", "Penhora",
   "Pensão", "Pensão complementar de reforma", "Pensão de reduzido montante", "Pensão de reforma", "Pensão de sobrevivência",
@@ -460,12 +460,12 @@ function App() {
 
   const handleOpenKey = async () => {
     try {
-        // @ts-ignore
-        if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-            // @ts-ignore
-            await window.aistudio.openSelectKey();
+        const aistudio = (window as any).aistudio;
+        if (aistudio && typeof aistudio.openSelectKey === 'function') {
+            await aistudio.openSelectKey();
+            // Após abrir, o ambiente injetará automaticamente a key em process.env.API_KEY
         } else {
-            alert("A funcionalidade de seleção de chave não está disponível neste ambiente.");
+            alert("A funcionalidade de seleção de chave não está disponível neste ambiente (AI Studio API não detetada). Certifique-se que está a utilizar o JurisAnalítica dentro da plataforma suportada.");
         }
     } catch (err) {
         console.error("Erro ao abrir seletor de chave:", err);
