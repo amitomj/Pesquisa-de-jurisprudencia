@@ -9,7 +9,6 @@ const preserveStructuralText = (text: string): string => {
     .trim();
 };
 
-// Remove secções de impugnação da matéria de facto para isolar o Direito
 const filterFactImpugnation = (text: string): string => {
   const impugnationMarkers = [
     /impugnação\s+da\s+matéria\s+de\s+facto/i,
@@ -21,7 +20,6 @@ const filterFactImpugnation = (text: string): string => {
   impugnationMarkers.forEach(marker => {
     const parts = cleaned.split(marker);
     if (parts.length > 1) {
-      // Tenta encontrar o próximo título importante para retomar o texto
       const resumeMarkers = [/II\.\s*Fundamentação/i, /O\s+Direito/i, /Apreciando/i, /Decisão/i];
       let resumeIndex = -1;
       resumeMarkers.forEach(rm => {
@@ -42,27 +40,31 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   // @ts-ignore
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
-  let fullText = '';
   const numPages = pdf.numPages;
+  const pagesText: string[] = [];
 
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     // @ts-ignore
     const strings = textContent.items.map((item: any) => item.str);
-    fullText += strings.join(' ') + '\n';
+    pagesText.push(strings.join(' '));
   }
 
-  const combinedSearchText = fullText;
+  const fullText = pagesText.join('\n');
   
-  // Metadados Básicos
+  // Regra de Pesquisa de Sumário: Primeiras 3 e Últimas 3 páginas
+  const firstThree = pagesText.slice(0, 3).join('\n');
+  const lastThree = pagesText.slice(Math.max(0, numPages - 3)).join('\n');
+  const textForSummary = firstThree + '\n---PÁGINAS FINAIS---\n' + lastThree;
+
   let relator = 'Desconhecido';
   let data = 'N/D';
   let adjuntos: string[] = [];
   let tipoDecisao: 'Acórdão' | 'Decisão Sumária' = 'Acórdão';
 
   const signatureRegex = /Assinado em\s+(\d{2}-\d{2}-\d{4}),\s*por\s*[\n\s]*([^\n,]+)/gi;
-  const matches = [...combinedSearchText.matchAll(signatureRegex)];
+  const matches = [...fullText.matchAll(signatureRegex)];
   if (matches.length > 0) {
     data = matches[0][1];
     relator = matches[0][2].trim();
@@ -72,21 +74,22 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     }
   }
 
-  const processMatch = combinedSearchText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
+  const processMatch = fullText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
   const processo = processMatch ? processMatch[1] : 'N/D';
 
-  // Segmentação Estrutural
-  const relatorioMatch = combinedSearchText.match(/(?:I\.\s*|Relatório|RELATÓRIO)([\s\S]*?)(?=(?:II\.\s*|Fundamentação|Factos))/i);
-  const factosProvadosMatch = combinedSearchText.match(/(?:Factos\s+Provados|Fundamentação\s+de\s+Facto)([\s\S]*?)(?=(?:Factos\s+não\s+Provados|III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
-  const factosNaoProvadosMatch = combinedSearchText.match(/(?:Factos\s+não\s+Provados)([\s\S]*?)(?=(?:III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
-  const direitoMatch = combinedSearchText.match(/(?:Fundamentação\s+de\s+Direito|O\s+Direito|III\.\s*Direito)([\s\S]*?)(?=(?:IV\.\s*|Decisão|Conclusão|$))/i);
+  const relatorioMatch = fullText.match(/(?:I\.\s*|Relatório|RELATÓRIO)([\s\S]*?)(?=(?:II\.\s*|Fundamentação|Factos))/i);
+  const factosProvadosMatch = fullText.match(/(?:Factos\s+Provados|Fundamentação\s+de\s+Facto)([\s\S]*?)(?=(?:Factos\s+não\s+Provados|III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
+  const factosNaoProvadosMatch = fullText.match(/(?:Factos\s+não\s+Provados)([\s\S]*?)(?=(?:III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
+  const direitoMatch = fullText.match(/(?:Fundamentação\s+de\s+Direito|O\s+Direito|III\.\s*Direito)([\s\S]*?)(?=(?:IV\.\s*|Decisão|Conclusão|$))/i);
 
-  // Regra Sumário Literal (3+3 páginas)
-  let sumario = '';
-  const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*I\s*[\)\.]|\n\s*1\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|$))/i;
-  const sumarioMatch = combinedSearchText.match(sumarioRegex);
-  if (sumarioMatch) sumario = preserveStructuralText(sumarioMatch[1]);
-  if (!sumario || sumario.length < 20) sumario = "Sumário não encontrado";
+  // Extração Literal do Sumário conforme regras
+  let sumario = 'Sumário não encontrado';
+  const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*[I1]\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|---PÁGINAS FINAIS---|$))/i;
+  
+  const sumarioMatch = textForSummary.match(sumarioRegex);
+  if (sumarioMatch && sumarioMatch[1].trim().length > 10) {
+    sumario = preserveStructuralText(sumarioMatch[1]);
+  }
 
   return {
     id: crypto.randomUUID(),
@@ -97,8 +100,8 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     data: cleanText(data),
     sumario: sumario,
     descritores: [],
-    textoAnalise: combinedSearchText,
-    textoCompleto: combinedSearchText,
+    textoAnalise: fullText,
+    textoCompleto: fullText,
     tipoDecisao,
     relatorio: relatorioMatch ? preserveStructuralText(relatorioMatch[1]) : '',
     factosProvados: factosProvadosMatch ? preserveStructuralText(factosProvadosMatch[1]) : '',

@@ -111,8 +111,9 @@ const SearchModule: React.FC<{
       return true;
     });
 
+    // Filtra documentos sem os dados específicos quando em modo lote
     if (batchMode === 'sumario') {
-      results = results.filter(item => !item.sumario || item.sumario === "Sumário não encontrado" || item.sumario.length < 50);
+      results = results.filter(item => item.sumario === "Sumário não encontrado" || !item.sumario);
     } else if (batchMode === 'tags') {
       results = results.filter(item => item.descritores.length === 0);
     } else if (batchMode === 'dados') {
@@ -127,18 +128,25 @@ const SearchModule: React.FC<{
       if (!silent) alert("⚠️ Configure a sua Chave API no topo.");
       return;
     }
+    
     if (!silent) setIsProcessing({ id: item.id, mode });
+
     try {
+      // Regra: Sumário ou Descritores eliminam conteúdo atual
       if (mode === 'sumario' || mode === 'tags') {
+         if (!silent) onUpdateAcordao({ ...item, sumario: mode === 'sumario' ? 'A pesquisar novo sumário...' : item.sumario, descritores: mode === 'tags' ? [] : item.descritores });
+         
          const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors, apiKey);
          if (result) {
             onUpdateAcordao({
                 ...item,
-                sumario: result.sumario || "Sumário não encontrado",
-                descritores: result.descritores || []
+                sumario: mode === 'sumario' ? (result.sumario || "Sumário não encontrado") : item.sumario,
+                descritores: mode === 'tags' ? (result.descritores || []) : item.descritores
             });
          }
-      } else if (mode === 'dados') {
+      } 
+      // Regra: Dados apenas completam o que falta
+      else if (mode === 'dados') {
          const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors, apiKey);
          if (result) {
             const updated = { ...item };
@@ -159,7 +167,6 @@ const SearchModule: React.FC<{
     setBatchProgress(0);
     const queue = [...filteredResults];
     for (let i = 0; i < queue.length; i++) {
-      if (!isBatchRunning && i > 0 && !batchMode) break;
       setBatchProgress(i + 1);
       await runIA(queue[i], batchMode, true);
     }
@@ -222,10 +229,18 @@ const SearchModule: React.FC<{
                 <Activity className={`w-6 h-6 ${isBatchRunning ? 'animate-pulse text-orange-400' : 'text-white'}`} />
                 <div>
                    <h4 className="text-xs font-black uppercase tracking-widest">Modo Lote: {batchMode}</h4>
-                   <p className="text-[10px] font-bold text-legal-400 uppercase mt-1">{isBatchRunning ? `Processando... Faltam ${filteredResults.length - batchProgress}` : `${filteredResults.length} identificados.`}</p>
+                   <p className="text-[10px] font-bold text-legal-400 uppercase mt-1">
+                     {isBatchRunning 
+                       ? `Processando... ${batchProgress} de ${filteredResults.length} concluídos` 
+                       : `${filteredResults.length} documentos para processar.`}
+                   </p>
                 </div>
              </div>
-             <button onClick={startBatchProcess} className="px-8 py-3 bg-white text-legal-900 rounded-xl text-[10px] font-black uppercase shadow-xl flex items-center gap-2"><Play className="w-3.5 h-3.5 fill-current"/> Iniciar Processamento</button>
+             {!isBatchRunning && (
+                <button onClick={startBatchProcess} className="px-8 py-3 bg-white text-legal-900 rounded-xl text-[10px] font-black uppercase shadow-xl flex items-center gap-2 hover:scale-105 transition-all">
+                  <Play className="w-3.5 h-3.5 fill-current"/> Iniciar Processamento
+                </button>
+             )}
           </div>
         )}
 
@@ -239,23 +254,34 @@ const SearchModule: React.FC<{
                     <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-3 py-2 rounded-xl">{item.data}</div>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => runIA(item, 'sumario')} className="p-3 bg-orange-50 text-orange-600 rounded-2xl hover:bg-orange-600 hover:text-white transition-all"><AlignLeft className="w-4 h-4"/></button>
-                    <button onClick={() => runIA(item, 'tags')} className="p-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-600 hover:text-white transition-all"><Tag className="w-4 h-4"/></button>
-                    <button onClick={() => runIA(item, 'dados')} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all"><UserCheck className="w-4 h-4"/></button>
+                    <button onClick={() => runIA(item, 'sumario')} title="Regenerar Sumário (Elimina atual)" className="p-3 bg-orange-50 text-orange-600 rounded-2xl hover:bg-orange-600 hover:text-white transition-all">
+                      {isProcessing?.id === item.id && isProcessing.mode === 'sumario' ? <Loader2 className="w-4 h-4 animate-spin"/> : <AlignLeft className="w-4 h-4"/>}
+                    </button>
+                    <button onClick={() => runIA(item, 'tags')} title="Regenerar Descritores (Elimina atuais)" className="p-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-600 hover:text-white transition-all">
+                      {isProcessing?.id === item.id && isProcessing.mode === 'tags' ? <Loader2 className="w-4 h-4 animate-spin"/> : <Tag className="w-4 h-4"/>}
+                    </button>
+                    <button onClick={() => runIA(item, 'dados')} title="Completar Metadados (Mantém atuais)" className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">
+                      {isProcessing?.id === item.id && isProcessing.mode === 'dados' ? <Loader2 className="w-4 h-4 animate-spin"/> : <UserCheck className="w-4 h-4"/>}
+                    </button>
                     <button onClick={() => setEditingItem(item)} className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all"><Pencil className="w-4 h-4"/></button>
                     <button onClick={() => onOpenPdf(item.fileName)} className="p-3 bg-legal-900 text-white rounded-2xl shadow-xl hover:bg-black transition-all"><FileText className="w-4 h-4"/></button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-[1fr,250px] gap-8">
                     <div className="space-y-4">
-                        <p className="text-sm text-gray-700 font-serif italic leading-relaxed bg-gray-50/50 p-6 rounded-[2rem] border border-gray-50 whitespace-pre-wrap">{item.sumario}</p>
+                        <p className={`text-sm text-gray-700 font-serif italic leading-relaxed bg-gray-50/50 p-6 rounded-[2rem] border border-gray-50 whitespace-pre-wrap ${item.sumario === 'Sumário não encontrado' ? 'opacity-40' : ''}`}>
+                          {item.sumario}
+                        </p>
                         <div className="flex flex-wrap gap-2">
                             {item.descritores.map((tag, idx) => (<span key={idx} className="bg-legal-50 text-legal-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-legal-100">{tag}</span>))}
                         </div>
                     </div>
                     <div className="bg-gray-50 rounded-[2rem] p-6 space-y-4 self-start">
-                        <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Relator</span><div className="text-[11px] font-black uppercase text-legal-900">{item.relator}</div></div>
-                        <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Duração Direito</span><div className="text-[9px] font-bold text-gray-500 uppercase">{item.fundamentacaoDireito ? `${Math.round(item.fundamentacaoDireito.length / 5)} palavras` : 'S/D'}</div></div>
+                        <div>
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Relator</span>
+                          <div className={`text-[11px] font-black uppercase ${item.relator === 'Desconhecido' ? 'text-red-400' : 'text-legal-900'}`}>{item.relator}</div>
+                        </div>
+                        <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Fundamentação Direito</span><div className="text-[9px] font-bold text-gray-500 uppercase">{item.fundamentacaoDireito ? `${Math.round(item.fundamentacaoDireito.length / 5)} palavras` : 'Não extraído'}</div></div>
                     </div>
                 </div>
               </div>
@@ -282,11 +308,11 @@ const SearchModule: React.FC<{
                 <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Data</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.data} onChange={e => setEditingItem({...editingItem, data: e.target.value})} /></div>
               </div>
               <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Sumário</label><textarea rows={8} className="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-sm font-serif italic outline-none resize-none" value={editingItem.sumario} onChange={e => setEditingItem({...editingItem, sumario: e.target.value})} /></div>
-              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Descritores (vírgula)</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.descritores.join(', ')} onChange={e => setEditingItem({...editingItem, descritores: e.target.value.split(',').map(s => s.trim())})} /></div>
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Descritores (separados por vírgula)</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.descritores.join(', ')} onChange={e => setEditingItem({...editingItem, descritores: e.target.value.split(',').map(s => s.trim())})} /></div>
             </form>
             <div className="p-8 bg-gray-50 border-t flex gap-4">
                 <button type="button" onClick={() => setEditingItem(null)} className="flex-1 py-4 border border-gray-200 text-gray-400 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
-                <button onClick={handleSaveManualEdit} className="flex-1 py-4 bg-legal-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar</button>
+                <button onClick={handleSaveManualEdit} className="flex-1 py-4 bg-legal-900 text-white rounded-2xl font-black text-[10px] uppercase shadow-xl flex items-center justify-center gap-2"><Save className="w-4 h-4" /> Guardar Alterações</button>
             </div>
           </div>
         </div>
