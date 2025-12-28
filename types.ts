@@ -1,5 +1,4 @@
 
-
 export interface Acordao {
   id: string;
   processo: string;
@@ -58,7 +57,6 @@ declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
-    // Fix: Made optional to match identical modifiers in existing global declarations
     aistudio?: AIStudio;
   }
 }

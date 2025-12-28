@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2, Settings } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -83,7 +83,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
   "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Desccaracterização de acidente de trabalho",
-  "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
+  "Desconsideração da personality colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
   "Desprezo pelas regras de segurança", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
   "Despacho de mero expediente", "Despacho do relator", "Despacho homologatório", "Despacho liminar", "Despacho normativo",
@@ -137,7 +137,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Honorários", "Horário de trabalho", "Horário flexível", "Hospital", "IAS", "Igreja", "Igualdade das partes", "Ilações",
   "Ilicitude", "Ilisão", "Impedimento", "Impenhorabilidade", "Imperatividade da lei", "Impossibilidade absoluta",
   "Impossibilidade definitiva", "Impossibilidade do cumprimento", "Impossibilidade objectiva", "Impossibilidade superveniente",
-  "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisões intercalares",
+  "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisions intercalares",
   "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incompetência absoluta", "Incompetência relativa",
   "Inconstitucionalidade", "Incumprimento do contrato",
   "Incumprimento parcial", "Incumprimento por facto de terceiro", "Indeferimento liminar", "Indeferimento tácito",
@@ -266,7 +266,7 @@ function App() {
   const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
   const [isAiConnecting, setIsAiConnecting] = useState<boolean>(false);
   
-  const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
+  const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
@@ -277,43 +277,36 @@ function App() {
 
   useEffect(() => {
     const checkAiKey = async () => {
-      if (window.aistudio) {
+      // Procura em window ou no parent caso esteja em frame
+      const aistudio = window.aistudio || (window.parent as any)?.aistudio;
+      if (aistudio) {
         try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
+          const hasKey = await aistudio.hasSelectedApiKey();
           setIsAiConfigured(hasKey);
-          if (hasKey && onboardingStep === 'key') {
-             setOnboardingStep('area');
-          }
         } catch (e) {
-          console.debug("AI Studio context not yet ready");
+          console.debug("A aguardar disponibilidade do AI Studio...");
         }
       }
     };
     checkAiKey();
-  }, [onboardingStep]);
+    const interval = setInterval(checkAiKey, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleOpenAiKeyDialog = async () => {
-    if (!window.aistudio) {
-        alert("O sistema de faturamento do AI Studio não está acessível neste ambiente.");
+    const aistudio = window.aistudio || (window.parent as any)?.aistudio;
+    
+    if (!aistudio) {
+        alert("O sistema de faturamento do Google AI Studio não foi detetado neste ambiente. Se está no Vercel, certifique-se de que configurou o projeto como faturamento individual.");
         return;
     }
 
     try {
       setIsAiConnecting(true);
-      // Rules: Add a button which calls await window.aistudio.openSelectKey()
-      await window.aistudio.openSelectKey();
-      
-      // Rules: Race condition: A race condition can occur where hasSelectedApiKey() 
-      // may not immediately return true after the user selects a key with openSelectKey(). 
-      // To mitigate this, you MUST assume the key selection was successful 
-      // after triggering openSelectKey() and proceed to the app.
+      await aistudio.openSelectKey();
       setIsAiConfigured(true);
-      if (onboardingStep === 'key') {
-          setOnboardingStep('area');
-      }
     } catch (e) {
       console.error("Falha ao abrir seletor de chaves:", e);
-      alert("Ocorreu um erro ao tentar ligar a sua conta Google.");
     } finally {
       setIsAiConnecting(false);
     }
@@ -436,7 +429,7 @@ function App() {
             if (parsed.descriptors.civil) merged.civil = Array.from(new Set([...descriptors.civil, ...parsed.descriptors.civil])).sort();
             setDescriptors(merged);
         }
-        if (onboardingStep !== 'key') setOnboardingStep('app');
+        setOnboardingStep('app');
       } catch (err) {
         alert("Erro ao ler ficheiro de backup jurídico.");
       }
@@ -458,7 +451,7 @@ function App() {
                 const filteredNew = parsed.chatSessions.filter((s: ChatSession) => !existingIds.has(s.id));
                 return [...filteredNew, ...current];
             });
-            alert("Base de dados de chat carregada e fundida com sucesso.");
+            alert("Base de dados de chat carregada.");
         }
       } catch (err) {
         alert("Erro ao ler ficheiro de chat.");
@@ -467,46 +460,6 @@ function App() {
     reader.readAsText(file);
     e.target.value = '';
   };
-
-  if (onboardingStep === 'key') {
-    return (
-      <div className="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
-        <div className="bg-slate-900 rounded-[32px] shadow-2xl p-12 max-w-[600px] w-full text-center border border-slate-800 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600"></div>
-            <div className="mb-10 flex justify-center">
-              <div className="p-8 bg-blue-500/10 rounded-full border border-blue-500/20">
-                <ShieldCheck className="w-12 h-12 text-blue-400"/>
-              </div>
-            </div>
-            <h2 className="text-3xl font-black mb-4 tracking-tighter text-white uppercase">Ligação Segura à IA</h2>
-            <p className="text-slate-400 mb-8 text-sm leading-relaxed">
-                Esta aplicação funciona no modelo <strong>Faturamento Individual (BYOK)</strong>. 
-                Os seus documentos nunca saem deste browser, mas para que a IA os analise, 
-                precisa de ligar a sua própria conta paga da Google Cloud/AI Studio.
-            </p>
-            <div className="space-y-4">
-                <button 
-                    onClick={handleOpenAiKeyDialog} 
-                    disabled={isAiConnecting}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-6 rounded-[20px] font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
-                >
-                    {isAiConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5"/>}
-                    {isAiConnecting ? 'A abrir diálogo...' : 'Ligar a minha Conta Google (IA Studio)'}
-                </button>
-                <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl text-left border border-slate-700/50">
-                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                        Ao clicar, será aberto um diálogo oficial da Google. Pode revogar este acesso a qualquer momento.
-                        <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-blue-500 ml-1 underline flex items-center gap-1 mt-1">
-                            Consultar Custos da Google <ExternalLink className="w-3 h-3"/>
-                        </a>
-                    </p>
-                </div>
-            </div>
-        </div>
-      </div>
-    );
-  }
 
   const mainContent = onboardingStep === 'app' ? (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
@@ -524,29 +477,28 @@ function App() {
             <button 
                 onClick={handleOpenAiKeyDialog}
                 disabled={isAiConnecting}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'} disabled:opacity-50`}
-                title="Sua chave pessoal Google AI Studio"
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'} disabled:opacity-50`}
             >
                 {isAiConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConnecting ? 'Ligando...' : isAiConfigured ? 'Faturamento Pessoal Ativo' : 'Ligar IA Pessoal'}
+                {isAiConfigured ? 'Faturamento Individual Ativo' : 'Ligar Faturamento Individual'}
             </button>
 
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
             
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
-                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Histórico de Chat">
+                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Histórico">
                     <History className="w-4 h-4" />
                 </button>
-                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados de Chat">
+                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all">
                     <Download className="w-4 h-4" /> Chats
                 </button>
             </div>
 
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Acórdãos/Backup Geral">
+                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Base">
                     <Upload className="w-4 h-4" />
                 </button>
-                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados Jurídica">
+                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all">
                     <Save className="w-4 h-4" /> Acórdãos
                 </button>
             </div>
@@ -641,11 +593,20 @@ function App() {
             <div className="h-px bg-slate-700/50 my-6"></div>
             <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <Database className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-500"/> Acórdãos
+                    <Database className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-500"/> Base JSON
                 </button>
                 <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Histórico Chat
+                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Chats JSON
                 </button>
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-slate-700/50 flex flex-col gap-3">
+                 <button onClick={handleOpenAiKeyDialog} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 transition-all">
+                    <Settings className="w-4 h-4"/> Configurar Faturamento de IA
+                 </button>
+                 <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-[9px] text-slate-500 font-bold uppercase flex items-center justify-center gap-1 hover:text-slate-400">
+                    Sobre Custos da API Google <ExternalLink className="w-3 h-3"/>
+                 </a>
             </div>
           </div>
       </div>
