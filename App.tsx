@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -78,7 +78,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Custos aleatórios", "Dados pessoais", "Dano", "Danos patrimoniais", "Danos não patrimoniais", "Decisão administrativa",
   "Decisão condenatória", "Decisão disciplinar", "Decisão do Presidente do STJ", "Decisão final", "Decisão implícita",
   "Decisão intercalar", "Decisão prematura", "Decisão surpresa", "Declaração de não renovação", "Declaração de renovação",
-  "Declaração inexacta", "Declaração negocial", "Declaração receptícia", "Declaração tácita", "Declaração unilateral",
+  "Declaração inexacta", "Declaração receptícia", "Declaração tácita", "Declaração unilateral",
   "Declarações de parte", "Dedução de rendimentos auferidos após o despedimento", "Deficiência da gravação",
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
@@ -262,9 +262,11 @@ function App() {
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  
+  // BYOK State - Bring Your Own Key
   const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
   
-  const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
+  const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
@@ -275,33 +277,28 @@ function App() {
 
   useEffect(() => {
     const checkAiKey = async () => {
-      // Verifica se o ambiente AI Studio está disponível para seletor de chave
       if (window.aistudio) {
         try {
           const hasKey = await window.aistudio.hasSelectedApiKey();
           setIsAiConfigured(hasKey);
+          if (hasKey && onboardingStep === 'key') setOnboardingStep('area');
         } catch (e) {
-          console.debug("Erro ao verificar chave AI Studio");
+          console.debug("AI Studio context not available");
         }
-      } else if (process.env.API_KEY) {
-        // Se houver uma chave injetada globalmente (ex: Vercel Env Vars)
-        setIsAiConfigured(true);
       }
     };
     checkAiKey();
-  }, []);
+  }, [onboardingStep]);
 
   const handleOpenAiKeyDialog = async () => {
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
         setIsAiConfigured(true);
+        if (onboardingStep === 'key') setOnboardingStep('area');
       } catch (e) {
         console.error("Falha ao abrir seletor de chaves");
       }
-    } else {
-        // No Vercel sem integração AI Studio, explicamos as opções
-        alert("Modo de Utilização no Vercel:\n1. Como Proprietário: Configure a 'API_KEY' nas variáveis de ambiente do projeto.\n2. Como Utilizador Individual: Recomendamos o acesso através da plataforma Google AI Studio para ativar o seletor de chaves pessoais.");
     }
   };
 
@@ -422,7 +419,7 @@ function App() {
             if (parsed.descriptors.civil) merged.civil = Array.from(new Set([...descriptors.civil, ...parsed.descriptors.civil])).sort();
             setDescriptors(merged);
         }
-        setOnboardingStep('app');
+        if (onboardingStep !== 'key') setOnboardingStep('app');
       } catch (err) {
         alert("Erro ao ler ficheiro de backup jurídico.");
       }
@@ -454,6 +451,44 @@ function App() {
     e.target.value = '';
   };
 
+  if (onboardingStep === 'key') {
+    return (
+      <div className="fixed inset-0 bg-slate-950 z-[100] flex items-center justify-center p-4">
+        <div className="bg-slate-900 rounded-[32px] shadow-2xl p-12 max-w-[600px] w-full text-center border border-slate-800 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-600 via-sky-400 to-blue-600"></div>
+            <div className="mb-10 flex justify-center">
+              <div className="p-8 bg-blue-500/10 rounded-full border border-blue-500/20">
+                <ShieldCheck className="w-12 h-12 text-blue-400"/>
+              </div>
+            </div>
+            <h2 className="text-3xl font-black mb-4 tracking-tighter text-white uppercase">Ligação Segura à IA</h2>
+            <p className="text-slate-400 mb-8 text-sm leading-relaxed">
+                Esta aplicação funciona no modelo <strong>Faturamento Individual (BYOK)</strong>. 
+                Os seus documentos nunca saem deste browser, mas para que a IA os analise, 
+                precisa de ligar a sua própria conta paga da Google Cloud/AI Studio.
+            </p>
+            <div className="space-y-4">
+                <button 
+                    onClick={handleOpenAiKeyDialog} 
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-6 rounded-[20px] font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3"
+                >
+                    <Globe className="w-5 h-5"/> Ligar a minha Conta Google (IA Studio)
+                </button>
+                <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl text-left border border-slate-700/50">
+                    <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                        Ao clicar, será aberto um diálogo oficial da Google. Pode revogar este acesso a qualquer momento.
+                        <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-blue-500 ml-1 underline flex items-center gap-1 mt-1">
+                            Consultar Custos da Google <ExternalLink className="w-3 h-3"/>
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
+
   const mainContent = onboardingStep === 'app' ? (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
@@ -469,11 +504,11 @@ function App() {
             
             <button 
                 onClick={handleOpenAiKeyDialog}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400 animate-pulse'}`}
-                title="Configurar a sua própria chave API para IA"
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}
+                title="Sua chave pessoal Google AI Studio"
             >
                 {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConfigured ? 'IA Ativa' : 'Ligar IA Pessoal'}
+                {isAiConfigured ? 'Faturamento Pessoal Ativo' : 'Ligar IA Pessoal'}
             </button>
 
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
@@ -498,17 +533,6 @@ function App() {
           </div>
         </div>
       </header>
-
-      {!isAiConfigured && (
-          <div className="bg-orange-50 border-b border-orange-100 p-2 flex items-center justify-center gap-3 animate-in slide-in-from-top-4">
-              <AlertCircle className="w-4 h-4 text-orange-600" />
-              <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">
-                  A IA não está configurada. Algumas funcionalidades de análise automática estarão limitadas.
-                  <span className="mx-2 opacity-30">|</span>
-                  <button onClick={handleOpenAiKeyDialog} className="underline font-black hover:text-orange-900">Configurar Chave API</button>
-              </p>
-          </div>
-      )}
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
@@ -602,17 +626,6 @@ function App() {
                 <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
                     <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Histórico Chat
                 </button>
-            </div>
-            
-            <div className="mt-6 p-4 bg-slate-900/50 rounded-2xl border border-slate-700/50 text-left">
-                <div className="flex items-center gap-2 mb-2">
-                    <Info className="w-3 h-3 text-blue-400"/>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Nota de Privacidade IA</span>
-                </div>
-                <p className="text-[9px] text-slate-500 leading-relaxed font-bold uppercase">
-                    A análise de documentos é local. O envio de dados para a web ocorre exclusivamente quando utiliza as funções de IA (Sumários/Chat) para os servidores da Google.
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-blue-500 ml-1 underline">Faturação Individual</a>
-                </p>
             </div>
           </div>
       </div>

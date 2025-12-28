@@ -1,5 +1,6 @@
 
 
+
 export interface Acordao {
   id: string;
   processo: string;
@@ -50,10 +51,9 @@ export interface SearchResult {
 }
 
 declare global {
-  /**
-   * Interface representing the AI Studio environment controls.
-   * Defined globally to match environment definitions and avoid type name collisions.
-   */
+  // Interface representing the AI Studio environment controls.
+  // Moved inside declare global to fix "Subsequent property declarations must have the same type" 
+  // and resolve identity mismatches between local and global scope.
   interface AIStudio {
     hasSelectedApiKey: () => Promise<boolean>;
     openSelectKey: () => Promise<void>;
@@ -64,12 +64,8 @@ declare global {
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
     /**
      * aistudio property is injected by the environment.
-     * Fixed: removed 'readonly' and matching the global interface declaration 
-     * to resolve modifier mismatch and type collision errors.
+     * Removed 'readonly' modifier to fix the "All declarations of 'aistudio' must have identical modifiers" error.
      */
     aistudio: AIStudio;
   }
 }
-
-// Exporting the type for explicit imports if needed by other components.
-export type { AIStudio };
