@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2 } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -109,7 +109,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Encerramento de estabelecimento comercial", "Enfermeiro", "Enriquecimento sem causa", "Ensino particular", "Ensino profissional",
   "Ensino superior particular e cooperativo", "Entidade contratada pelo empregador", "Entidade executante",
   "Entidade pública empresarial", "Entrega do capital da remição", "Equidade", "Equipamentos de trabalho", "Erro",
-  "Erro da secretaria judicial", "Erro de julgamento", "Erro material", "Erro na apreciação das provas", "Erro na declaração",
+  "Erro da secretaria judicial", "Erro de julgamento", "Erro material", "Erro na appreciation das provas", "Erro na declaração",
   "Erro na forma do processo", "Erro na transmissão da declaração", "Erro sobre os motivos do negócio", "Especificação",
   "Estabelecimento comercial", "Estabelecimento industrial", "Estado", "Estado de emergência", "Estado de necessidade",
   "Estado estrangeiro", "Estafeta", "Estágio", "Estaleiros temporários ou móveis", "Estatuto do trabalhador cooperante",
@@ -263,8 +263,8 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   
-  // BYOK State - Bring Your Own Key
   const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
+  const [isAiConnecting, setIsAiConnecting] = useState<boolean>(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'key' | 'area' | 'app'>('key');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -281,9 +281,11 @@ function App() {
         try {
           const hasKey = await window.aistudio.hasSelectedApiKey();
           setIsAiConfigured(hasKey);
-          if (hasKey && onboardingStep === 'key') setOnboardingStep('area');
+          if (hasKey && onboardingStep === 'key') {
+             setOnboardingStep('area');
+          }
         } catch (e) {
-          console.debug("AI Studio context not available");
+          console.debug("AI Studio context not yet ready");
         }
       }
     };
@@ -291,14 +293,29 @@ function App() {
   }, [onboardingStep]);
 
   const handleOpenAiKeyDialog = async () => {
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        setIsAiConfigured(true);
-        if (onboardingStep === 'key') setOnboardingStep('area');
-      } catch (e) {
-        console.error("Falha ao abrir seletor de chaves");
+    if (!window.aistudio) {
+        alert("O sistema de faturamento do AI Studio não está acessível neste ambiente.");
+        return;
+    }
+
+    try {
+      setIsAiConnecting(true);
+      // Rules: Add a button which calls await window.aistudio.openSelectKey()
+      await window.aistudio.openSelectKey();
+      
+      // Rules: Race condition: A race condition can occur where hasSelectedApiKey() 
+      // may not immediately return true after the user selects a key with openSelectKey(). 
+      // To mitigate this, you MUST assume the key selection was successful 
+      // after triggering openSelectKey() and proceed to the app.
+      setIsAiConfigured(true);
+      if (onboardingStep === 'key') {
+          setOnboardingStep('area');
       }
+    } catch (e) {
+      console.error("Falha ao abrir seletor de chaves:", e);
+      alert("Ocorreu um erro ao tentar ligar a sua conta Google.");
+    } finally {
+      setIsAiConnecting(false);
     }
   };
 
@@ -470,9 +487,11 @@ function App() {
             <div className="space-y-4">
                 <button 
                     onClick={handleOpenAiKeyDialog} 
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-6 rounded-[20px] font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3"
+                    disabled={isAiConnecting}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white p-6 rounded-[20px] font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-900/20 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
                 >
-                    <Globe className="w-5 h-5"/> Ligar a minha Conta Google (IA Studio)
+                    {isAiConnecting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5"/>}
+                    {isAiConnecting ? 'A abrir diálogo...' : 'Ligar a minha Conta Google (IA Studio)'}
                 </button>
                 <div className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-2xl text-left border border-slate-700/50">
                     <Info className="w-5 h-5 text-blue-400 flex-shrink-0" />
@@ -504,11 +523,12 @@ function App() {
             
             <button 
                 onClick={handleOpenAiKeyDialog}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}
+                disabled={isAiConnecting}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'} disabled:opacity-50`}
                 title="Sua chave pessoal Google AI Studio"
             >
-                {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConfigured ? 'Faturamento Pessoal Ativo' : 'Ligar IA Pessoal'}
+                {isAiConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                {isAiConnecting ? 'Ligando...' : isAiConfigured ? 'Faturamento Pessoal Ativo' : 'Ligar IA Pessoal'}
             </button>
 
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
