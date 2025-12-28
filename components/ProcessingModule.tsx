@@ -117,10 +117,9 @@ const ProcessingModule: React.FC<Props> = ({
     if (selectedMainJudge && selectedAliases.length > 0 && onMergeJudges) {
       if (confirm(`Atenção: Irá substituir permanentemente ${selectedAliases.length} nomes por "${selectedMainJudge}" em toda a biblioteca. Continuar?`)) {
         onMergeJudges(selectedMainJudge, selectedAliases);
-        // Reset visual imediato
         setSelectedMainJudge(null);
         setSelectedAliases([]);
-        alert("Fusão de magistrados concluída. Os nomes antigos foram removidos e substituídos.");
+        alert("Fusão de magistrados concluída.");
       }
     }
   };
@@ -164,7 +163,6 @@ const ProcessingModule: React.FC<Props> = ({
               descritores: ac.descritores.map(d => d === targetTag ? val : d)
           }));
           onUpdateDb(updatedDb);
-          alert(`Substituição de "${targetTag}" por "${val}" efetuada em toda a biblioteca.`);
       }
 
       setNewDescriptor('');
@@ -221,6 +219,8 @@ const ProcessingModule: React.FC<Props> = ({
             } else if (aiResult) {
                 if (aiResult.sumario) data.sumario = aiResult.sumario;
                 if (aiResult.descritores) data.descritores = aiResult.descritores;
+                if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
+                if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
             }
         }
         newData.push(data);
@@ -321,7 +321,6 @@ const ProcessingModule: React.FC<Props> = ({
           </div>
       </div>
 
-      {/* PADRONIZAÇÃO DE MAGISTRADOS - GRID LADO A LADO */}
       <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
               <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
@@ -335,7 +334,6 @@ const ProcessingModule: React.FC<Props> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] items-start gap-8">
-              {/* Lado Esquerdo: Substituir */}
               <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-1 px-1">
                       <Trash2 className="w-3.5 h-3.5 text-orange-500" />
@@ -357,12 +355,10 @@ const ProcessingModule: React.FC<Props> = ({
                   </div>
               </div>
 
-              {/* Centro */}
               <div className="hidden md:flex items-center justify-center pt-12 text-gray-200">
                   <ArrowRight className="w-6 h-6" />
               </div>
 
-              {/* Lado Direito: Manter */}
               <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-1 px-1">
                       <Check className="w-3.5 h-3.5 text-green-600" />
@@ -426,7 +422,7 @@ const ProcessingModule: React.FC<Props> = ({
       </div>
 
       <div className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem] font-mono text-[11px] h-48 overflow-y-auto shadow-2xl border border-slate-800 custom-scrollbar">
-           {logs.map((log, i) => <div key={i} className="mb-1 opacity-80">> {log}</div>)}
+           {logs.map((log, i) => <div key={i} className="mb-1 opacity-80">{">"} {log}</div>)}
       </div>
     </div>
   );

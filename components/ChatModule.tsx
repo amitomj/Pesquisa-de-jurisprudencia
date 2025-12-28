@@ -52,8 +52,12 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
   };
 
   const formatDocLabel = (doc: Acordao) => {
-    if (doc.data !== 'N/D' && doc.relator !== 'Desconhecido') {
-        return `${doc.tipoDecisao === 'Decisão Sumária' ? 'decisão' : 'acórdão'} de ${doc.data}, relator ${doc.relator}`;
+    const isDoc = doc.tipoDecisao === 'Decisão Sumária' ? 'decisão' : 'acórdão';
+    const hasData = doc.data && doc.data !== 'N/D';
+    const hasRelator = doc.relator && doc.relator !== 'Desconhecido';
+    
+    if (hasData && hasRelator) {
+        return `${isDoc} de ${doc.data}, relator ${doc.relator}`;
     }
     return doc.fileName;
   };
