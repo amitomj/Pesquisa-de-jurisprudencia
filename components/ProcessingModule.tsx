@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle } from 'lucide-react';
+import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle, Save, Download } from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
@@ -18,6 +18,7 @@ interface Props {
   availableDescriptors?: string[]; 
   legalArea: 'social' | 'crime' | 'civil';
   onUpdateDb: (db: Acordao[]) => void;
+  onSaveDb: () => void;
 }
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -93,7 +94,7 @@ const JudgeAutocomplete: React.FC<{
 const ProcessingModule: React.FC<Props> = ({ 
     onDataLoaded, existingDB, onSetRootHandle, rootHandleName,
     onAddDescriptors, onMergeJudges, availableJudges = [], availableDescriptors = [],
-    legalArea, onUpdateDb
+    legalArea, onUpdateDb, onSaveDb
 }) => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -314,10 +315,16 @@ const ProcessingModule: React.FC<Props> = ({
                 <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Documentos</span>
                 <span className="text-2xl font-black">{existingDB.length}</span>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Total Descritores</span>
                 <span className="text-2xl font-black text-blue-400">{availableDescriptors?.length || 0}</span>
               </div>
+              <button 
+                onClick={onSaveDb}
+                className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                  <Save className="w-4 h-4 text-blue-400"/> Exportar Base de Dados
+              </button>
           </div>
       </div>
 

@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
-import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key, MessageSquare, Download, History } from 'lucide-react';
+import { Acordao, ChatSession } from './types';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2 } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -147,43 +147,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Informação genética", "Infracção continuada", "Infracção disciplinar", "Infracção estradal", "Início de laboração",
   "Inimputabilidade", "Injúrias", "Inquérito", "Inquérito prévio", "Inquirição de testemunhas", "Insolvência", "Interpelação",
   "Intervalo de descanso", "Instituição Particular de Solidariedade Social", "Instituições de crédito",
-  "Instituto de Segurança Social", "Instituto do Emprego e Formação Profissional", "Instituto Público", "Instrução técnica",
-  "Instrutor", "Interesse em agir", "Interesse imaterial", "Interesse público", "Interesses de particular relevância social",
-  "Internet", "Interposição de recurso", "Interpretação", "Interpretação analógica", "Interpretação conforme à Constituição",
-  "Interpretação da declaração negocial", "Interpretação da lei", "Interpretação de convenção colectiva de trabalho",
-  "Interpretação de sentença", "Interpretação do negócio jurídico", "Interrupção da instância", "Interrupção da prescrição",
-  "Intervenção acessória", "Intervenção de terceiros", "Intervenção principal", "Inutilidade superveniente da lide",
-  "Invalidade", "Invalidade do procedimento disciplinar", "Invalidade parcial", "Inversão do contencioso", "Inversão do ónus da prova",
-  "IRCT", "Irredutibilidade da retribuição", "Irregularidade", "Irregularidade processual", "Irrevogabilidade", "IRS", "Isenção",
-  "Isenção de horário de trabalho", "Jogador de futebol", "Jornalista", "Juízo pericial", "Juízos Cíveis", "Juízos do Trabalho",
-  "Julgamento", "Julgamento ampliado", "Junção de documento", "Junção do procedimento disciplinar", "Junta médica",
-  "Juros de mora", "Jus variandi", "Justa causa de despedimento", "Justa causa de resolução", "Justo impedimento", "Lacuna",
-  "Lançamento de nova actividade", "Lapso manifesto", "Lar de terceira idade", "Lay-off", "Legitimidade", "Legitimidade activa",
-  "Legitimidade passiva", "Lei aplicável", "Lei do Orçamento de Estado", "Lei especial", "Lei interpretativa",
-  "Lesão de interesses patrimoniais sérios", "Liberdade contratual", "Liberdade de escolha de profissão",
-  "Liberdade de expressão e de opinião", "Licença ilimitada", "Licença parental", "Licença sem vencimento de longa duração",
-  "Limite de idade", "Limite máximo da pena", "Limites à duração do trabalho", "Limites da condenação", "Liquidação",
-  "Liquidação de sentença", "Liquidatário", "Litigância de má fé", "Litisconsórcio", "Litisconsórcio necessário",
-  "Litisconsórcio voluntário", "Livrete individual de controlo", "Local de pagamento", "Local de refeição", "Local de trabalho",
-  "Má fé", "Mandato", "Mandato forense", "Massa insolvente", "Matéria de direito", "Matéria de facto", "Mediação",
-  "Medida da coima", "Meios de prova", "Meios de vigilância a distância", "Melhoria da aplicação do direito", "Menor",
-  "Microempresa", "Ministro do culto", "Mobbing", "Mobilidade funcional", "Mora", "Morte do empregador", "Morte do trabalhador",
-  "Motivação", "Motivo de força maior", "Motorista", "Mudança do estabelecimento", "Multa", "Músico", "Não admissão do recurso",
-  "Natureza jurídica", "Necessidade atendível", "Negligência consciente", "Negligência grosseira", "Negligência médica",
-  "Negócio formal", "Nexo de causalidade", "Nomeação de patrono", "Norma imperativa", "Nota de culpa", "Notificação",
-  "Notificação entre advogados", "Notificação para pagamento de multa", "Novação", "Novo julgamento", "Nulidade",
-  "Nulidade da estipulação do termo", "Nulidade de acórdão", "Nulidade de cláusula", "Nulidade de despacho",
-  "Nulidade de sentença", "Nulidade do contrato", "Nulidade insanável", "Nulidade por falta de forma", "Nulidade processual",
-  "Objecto do contrato de seguro", "Objecto do litígio", "Objecto do negócio", "Objecto do recurso",
-  "Obras na residência do sinistrado", "Obrigação de indemnização", "Obrigação fiscal", "Obrigação ilíquida",
-  "Obrigação natural", "Obrigação voluntária", "Obrigatoriedade de pagamento", "Obscuridade", "Ofensas à honra do trabalhador",
-  "Oficial de justiça", "Omissão de gravação da prova", "Omissão de pronúncia", "Ónus da prova", "Ónus de alegação",
-  "Ónus de concluir", "Oposição", "Oposição à execução", "Oposição à liquidação", "Oposição à reintegração",
-  "Oposição de acórdãos", "Oposição entre os fundamentos e a decisão", "Ordem de julgamento", "Ordem de serviço",
-  "Ordem escrita", "Ordem legítima", "Ordem pública internacional", "Órgãos de administração", "Órgãos de fiscalização",
-  "Outsourcing", "Pacto de desaforamento", "Pacto de não concorrência", "Pacto de permanência", "Pacto privativo de jurisdição",
-  "Pagamento", "Pagamento de retribuições intercalares pelo Estado", "Pagamento em prestações", "Parecer da CITE",
-  "Parecer do Instituto do Emprego e Formação Profimplamentaional", "Parecer do Ministério Público", "Parecer do Sindicato",
+  "Instituto de Segurança Social", "Instituto do Emprego e Formação Profimplamentaional", "Parecer do Ministério Público", "Parecer do Sindicato",
   "Parecer técnico", "Parentalidade", "Património autónomo", "Participação de acidente de trabalho", "Patrocínio oficioso",
   "Pedido", "Pedido de juros", "Pedido genérico", "Pedido principal", "Pedido subsidiário", "Pedidos alternativos", "Penhora",
   "Pensão", "Pensão complementar de reforma", "Pensão de reduzido montante", "Pensão de reforma", "Pensão de sobrevivência",
@@ -213,7 +177,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Procedimento cautelar", "Processo comum", "Processo de contra-ordenação", "Processo de insolvência", "Processo de trabalho",
   "Processo equitativo", "Processo especial de recuperação de empresa", "Processo executivo", "Processo penal",
   "Processo urgente", "Procuração", "Professor", "Professor universitário", "Progressão na carreira", "Progressão salarial",
-  "Progressão na categoria", "Proibição de discriminação", "Proibição de prova", "Proibição do lock-out",
+  "Progressão na categoria", "Proibição de discrimininação", "Proibição de prova", "Proibição do lock-out",
   "Promessa de contrato de trabalho", "Proporcionais de férias e de subsídios de férias e de Natal", "Propositura da acção",
   "Prorrogação do prazo", "Protecção contra quedas", "Protecção da maternidade e paternidade", "Protecção de dados pessoais",
   "Protocolo", "Prova", "Prova documental", "Prova gravada", "Prova pericial", "Prova plena", "Prova por confissão",
@@ -458,20 +422,6 @@ function App() {
     e.target.value = '';
   };
 
-  const handleOpenKey = async () => {
-    try {
-        const aistudio = (window as any).aistudio;
-        if (aistudio && typeof aistudio.openSelectKey === 'function') {
-            await aistudio.openSelectKey();
-            // Após abrir, o ambiente injetará automaticamente a key em process.env.API_KEY
-        } else {
-            alert("A funcionalidade de seleção de chave não está disponível neste ambiente (AI Studio API não detetada). Certifique-se que está a utilizar o JurisAnalítica dentro da plataforma suportada.");
-        }
-    } catch (err) {
-        console.error("Erro ao abrir seletor de chave:", err);
-    }
-  };
-
   const mainContent = onboardingStep === 'app' ? (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
@@ -488,27 +438,23 @@ function App() {
             
             {/* Secção de Chats */}
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
-                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Chats">
+                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Histórico de Chat">
                     <History className="w-4 h-4" />
                 </button>
-                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Chats">
+                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados de Chat">
                     <Download className="w-4 h-4" /> Chats
                 </button>
             </div>
 
             {/* Secção Legal */}
-            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
+            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
                 <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Acórdãos/Backup Geral">
                     <Upload className="w-4 h-4" />
                 </button>
-                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Geral (Acórdãos e Descritores)">
+                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados Jurídica">
                     <Save className="w-4 h-4" /> Acórdãos
                 </button>
             </div>
-
-            <button onClick={handleOpenKey} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all ml-2">
-              <Key className="w-4 h-4" /> Chave API
-            </button>
           </div>
         </div>
       </header>
@@ -536,6 +482,7 @@ function App() {
                 availableDescriptors={descriptors[legalArea]}
                 legalArea={legalArea}
                 onUpdateDb={setDb}
+                onSaveDb={handleSaveDb}
               />
             )}
             {activeTab === 'search' && (
@@ -545,6 +492,7 @@ function App() {
                 onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
                 availableDescriptors={legalArea?descriptors[legalArea]:[]} 
                 availableJudges={judges} 
+                onSaveDb={handleSaveDb}
               />
             )}
             {activeTab === 'chat' && (
@@ -576,7 +524,7 @@ function App() {
             </div>
           </div>
           <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">JurisAnalítica</h2>
-          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
+          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição ou importe uma base existente.</p>
           <div className="grid grid-cols-1 gap-4">
             {['social', 'crime', 'civil'].map((area: any) => (
               <button 
@@ -589,17 +537,17 @@ function App() {
                 </div>
                 <div>
                     <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sessão Limpa</div>
                 </div>
               </button>
             ))}
             <div className="h-px bg-slate-700/50 my-6"></div>
             <div className="grid grid-cols-2 gap-3">
                 <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <Upload className="w-5 h-5 group-hover:scale-110 transition-transform"/> Backup Geral
+                    <Database className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-500"/> Acórdãos
                 </button>
                 <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform"/> Só Chats
+                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Histórico Chat
                 </button>
             </div>
           </div>
@@ -610,7 +558,6 @@ function App() {
   return (
     <>
       {mainContent}
-      {/* Input para carregar acórdãos/backup legal */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -618,7 +565,6 @@ function App() {
         accept=".json" 
         onChange={handleLoadDbFile}
       />
-      {/* Input para carregar apenas histórico de chat */}
       <input 
         type="file" 
         ref={chatInputRef} 

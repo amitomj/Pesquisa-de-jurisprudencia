@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info, RefreshCw, AlertCircle, Edit2, Check, Save } from 'lucide-react';
+import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info, RefreshCw, AlertCircle, Edit2, Check, Save, Download } from 'lucide-react';
 import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
 
 const fuzzyNormalize = (str: string) => {
@@ -137,7 +137,8 @@ const SearchModule: React.FC<{
   onUpdateAcordao: (item: Acordao) => void;
   availableDescriptors: string[];
   availableJudges: string[];
-}> = ({ db, onOpenPdf, onUpdateAcordao, availableDescriptors, availableJudges }) => {
+  onSaveDb: () => void;
+}> = ({ db, onOpenPdf, onUpdateAcordao, availableDescriptors, availableJudges, onSaveDb }) => {
   const [filters, setFilters] = useState<SearchFilters>({
     processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
   });
@@ -498,26 +499,35 @@ const SearchModule: React.FC<{
                       onClick={() => handleSelectBatchMode('dados')} 
                       className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-[9px] font-black uppercase border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                     >
-                        <Activity className="w-3.5 h-3.5"/> Metadados em falta
+                        <Activity className="w-3.5 h-3.5"/> Metadados
                     </button>
                     <button 
                       onClick={() => handleSelectBatchMode('sumario')} 
                       className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-700 rounded-xl text-[9px] font-black uppercase border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
                     >
-                        <AlignLeft className="w-3.5 h-3.5"/> Sumários em falta
+                        <AlignLeft className="w-3.5 h-3.5"/> Sumários
                     </button>
                     <button 
                       onClick={() => handleSelectBatchMode('tags')} 
                       className="flex items-center gap-2 px-4 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-[9px] font-black uppercase border border-purple-100 hover:bg-purple-600 hover:text-white transition-all shadow-sm"
                     >
-                        <Tag className="w-3.5 h-3.5"/> Tags em falta
+                        <Tag className="w-3.5 h-3.5"/> Tags
                     </button>
-                    <div className="w-px bg-gray-200 mx-2"></div>
+                    <div className="w-px bg-gray-200 mx-1"></div>
                     <button 
                       onClick={() => handleSelectBatchMode('revisao')} 
-                      className="flex items-center gap-2 px-4 py-2.5 bg-legal-900 text-white rounded-xl text-[9px] font-black uppercase shadow-md hover:bg-black transition-all"
+                      className="flex items-center gap-2 px-4 py-2.5 bg-legal-600 text-white rounded-xl text-[9px] font-black uppercase shadow-md hover:bg-legal-900 transition-all"
+                      title="Re-processar todos os sumários filtrados"
                     >
-                        <RefreshCw className="w-3.5 h-3.5"/> Revisão Global
+                        <RefreshCw className="w-3.5 h-3.5"/> Revisão
+                    </button>
+                    <div className="w-px bg-gray-200 mx-1"></div>
+                    <button 
+                      onClick={onSaveDb} 
+                      className="flex items-center gap-2 px-5 py-2.5 bg-legal-900 text-white rounded-xl text-[9px] font-black uppercase shadow-xl hover:bg-black transition-all"
+                      title="Exportar base de dados atual (.json)"
+                    >
+                        <Save className="w-3.5 h-3.5 text-blue-300"/> Guardar Base
                     </button>
                 </div>
             )}
