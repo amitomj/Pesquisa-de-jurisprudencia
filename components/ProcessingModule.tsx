@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle } from 'lucide-react';
+import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle, Key } from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
@@ -19,6 +19,7 @@ interface Props {
   legalArea: 'social' | 'crime' | 'civil';
   onUpdateDb: (db: Acordao[]) => void;
   onSaveDb: () => void;
+  apiKey: string;
 }
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -94,7 +95,7 @@ const JudgeAutocomplete: React.FC<{
 const ProcessingModule: React.FC<Props> = ({ 
     onDataLoaded, existingDB, onSetRootHandle, rootHandleName,
     onAddDescriptors, onMergeJudges, availableJudges = [], availableDescriptors = [],
-    legalArea, onUpdateDb
+    legalArea, onUpdateDb, apiKey
 }) => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -193,6 +194,11 @@ const ProcessingModule: React.FC<Props> = ({
   };
 
   const processFileList = async (files: File[]) => {
+    if (!apiKey) {
+      alert("Configure primeiro a sua Gemini API Key no topo da aplicação para permitir extração automática.");
+      return;
+    }
+
     setProcessing(true);
     setLogs(prev => [`Analisando ${files.length} ficheiros...`]);
     stopRequested.current = false;
@@ -214,10 +220,8 @@ const ProcessingModule: React.FC<Props> = ({
         let data = await extractDataFromPdf(file);
         
         if (data.sumario.includes('não identificado')) {
-            const aiResult = await extractMetadataWithAI(data.textoCompleto, availableDescriptors || []);
-            if (aiResult === "API_LIMIT_REACHED") {
-                stopRequested.current = true;
-            } else if (aiResult) {
+            const aiResult = await extractMetadataWithAI(data.textoCompleto, availableDescriptors || [], apiKey);
+            if (aiResult) {
                 if (aiResult.sumario) data.sumario = aiResult.sumario;
                 if (aiResult.descritores) data.descritores = aiResult.descritores;
             }
@@ -242,6 +246,16 @@ const ProcessingModule: React.FC<Props> = ({
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 h-full overflow-y-auto custom-scrollbar pb-32">
+      {!apiKey && (
+        <div className="bg-orange-50 border border-orange-200 p-6 rounded-3xl flex items-center gap-4 text-orange-800 animate-in fade-in">
+          <Key className="w-8 h-8 flex-shrink-0" />
+          <div className="flex-1">
+             <h4 className="font-black uppercase text-xs">IA Não Configurada</h4>
+             <p className="text-[10px] font-bold opacity-80 uppercase leading-tight">A extração de sumários e descritores automáticos requer uma Gemini API Key ativa.</p>
+          </div>
+        </div>
+      )}
+
       {processing && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md">
            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-6">

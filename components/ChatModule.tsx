@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Acordao, ChatSession, ChatMessage } from '../types';
 import { generateLegalAnswer } from '../services/geminiService';
-import { Send, Bot, Trash2, FileText, X, Scale, Library, ExternalLink, Calendar, User } from 'lucide-react';
+import { Send, Bot, Trash2, FileText, X, Scale, Library, Key, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Props {
@@ -11,9 +11,10 @@ interface Props {
   onSaveSession: (session: ChatSession) => void;
   onDeleteSession: (id: string) => void;
   onOpenPdf: (fileName: string) => void;
+  apiKey: string;
 }
 
-const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf }) => {
+const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf, apiKey }) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,6 +24,10 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
   };
 
   const handleSend = async () => {
+    if (!apiKey) {
+      alert("Configure primeiro a sua Gemini API Key no topo.");
+      return;
+    }
     if (!input.trim() || loading) return;
     if (!currentSession) startNewChat();
 
@@ -40,7 +45,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         return keywords.some(k => text.includes(k));
       }).slice(0, 35); 
 
-      const answer = await generateLegalAnswer(input, relevantContext);
+      const answer = await generateLegalAnswer(input, relevantContext, apiKey);
       const botMsg: ChatMessage = { id: crypto.randomUUID(), role: 'model', content: answer, timestamp: Date.now(), sources: relevantContext };
 
       setCurrentSession(prev => {
@@ -73,11 +78,25 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
               </button>
             );
           }
-          return <ReactMarkdown key={i} components={{ p: ({children}) => <span className="inline">{children}</span>, h3: ({children}) => <h3 className="text-xl font-black text-legal-900 mt-6 mb-2 border-b border-gray-100 pb-2">{children}</h3> }}>{part}</ReactMarkdown>;
+          return <ReactMarkdown key={i} components={{ p: ({children}) => <span className="inline">{children}</span> }}>{part}</ReactMarkdown>;
         })}
       </div>
     );
   };
+
+  if (!apiKey) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-10 text-center space-y-6">
+        <div className="p-10 bg-orange-100 rounded-full border-4 border-orange-200 animate-pulse">
+            <Key className="w-16 h-16 text-orange-600" />
+        </div>
+        <div>
+            <h3 className="text-2xl font-black uppercase tracking-tighter text-legal-900">IA Não Configurada</h3>
+            <p className="text-gray-500 text-sm max-w-md mt-2">Para utilizar o assistente jurídico e análise cruzada, configure a sua <strong>Gemini API Key</strong> no topo da página. Os seus dados permanecem 100% privados no seu browser.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full bg-gray-50">
