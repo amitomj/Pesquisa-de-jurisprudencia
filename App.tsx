@@ -140,11 +140,8 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Ilicitude", "Ilisão", "Impedimento", "Impenhorabilidade", "Imperatividade da lei", "Impossibilidade absoluta",
   "Impossibilidade definitiva", "Impossibilidade do cumprimento", "Impossibilidade objectiva", "Impossibilidade superveniente",
   "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisões intercalares",
-  "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incapacidade funcional", "Incapacidade grave",
-  "Incapacidade para o exercício de outra profissão", "Incapacidade permanente absoluta",
-  "Incapacidade permanente absoluta para o trabalho habitual", "Incapacidade permanente parcial", "Incapacidade temporária",
-  "Incapacidade temporária absoluta", "Incapacidade temporária superior a dezoito meses", "Incidentes da instância",
-  "Incompetência absoluta", "Incompetência relativa", "Inconstitucionalidade", "Incumprimento do contrato",
+  "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incompetência absoluta", "Incompetência relativa",
+  "Inconstitucionalidade", "Incumprimento do contrato",
   "Incumprimento parcial", "Incumprimento por facto de terceiro", "Indeferimento liminar", "Indeferimento tácito",
   "Indemnização", "Indemnização de antiguidade", "Indemnização por falta de aviso prévio",
   "Indemnização por incumprimento de obrigações laborais", "Indeterminabilidade", "Indeterminação do objecto",
@@ -439,6 +436,11 @@ function App() {
     e.target.value = ''; 
   };
 
+  const handleOpenKey = async () => {
+    // @ts-ignore
+    await window.aistudio.openSelectKey();
+  };
+
   const mainContent = onboardingStep === 'app' ? (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
@@ -451,6 +453,9 @@ function App() {
             </div>
           </div>
           <div className="flex gap-2">
+            <button onClick={handleOpenKey} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
+              <Key className="w-4 h-4" /> Chave API
+            </button>
             <button onClick={() => fileInputRef.current?.click()} className="bg-legal-800 hover:bg-legal-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 border border-legal-700 transition-all">
               <FolderOpen className="w-4 h-4" /> Importar
             </button>
