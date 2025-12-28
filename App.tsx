@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
-import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
+import { Acordao, ChatSession } from './types';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2, Settings, FolderOpen } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -45,7 +45,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Cartão de crédito", "Carteira profissional", "Cartório Notarial", "Caso julgado", "Caso julgado formal",
   "Caso julgado material", "Categoria profissional", "Caução", "Causa de pedir", "Causa justificativa", "Causa prejudicial",
   "Cedência ocasional de trabalhador", "Cedente", "Cessação da comissão de serviço", "Cessação da empreitada",
-  "Cessação do contrato de trabalho", "Cessação por acordo", "Cessão da posição contratual", "Cessão de exploração de estabelecimento",
+  "Cessação do contrato de trabalho", "Cessação por acordo", "Cessão da position contratual", "Cessão de exploração de estabelecimento",
   "Cessionário", "Cinto de segurança", "Circunstâncias atenuantes", "Cisão de empresa", "Citação", "Citação de sociedade",
   "Citação prévia", "CITE", "Citius", "Classificação profissional", "Cláusula adicional", "Cláusula de mobilidade geográfica",
   "Cláusula de remissão", "Cláusulas contratuais gerais", "Coacção moral", "Coligação activa", "Coligação de contratos",
@@ -83,7 +83,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
   "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
-  "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
+  "Desconsideração da personality colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
   "Desempregado de longa duração", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
   "Despacho de mero expediente", "Despacho do relator", "Despacho homologatório", "Despacho liminar", "Despacho normativo",
@@ -109,7 +109,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Encerramento de estabelecimento comercial", "Enfermeiro", "Enriquecimento sem causa", "Ensino particular", "Ensino profissional",
   "Ensino superior particular e cooperativo", "Entidade contratada pelo empregador", "Entidade executante",
   "Entidade pública empresarial", "Entrega do capital da remição", "Equidade", "Equipamentos de trabalho", "Erro",
-  "Erro da secretaria judicial", "Erro de julgamento", "Erro material", "Erro na apreciação das provas", "Erro na declaração",
+  "Erro da secretaria judicial", "Erro de julgamento", "Erro material", "Erro na appreciation das provas", "Erro na declaração",
   "Erro na forma do processo", "Erro na transmissão da declaração", "Erro sobre os motivos do negócio", "Especificação",
   "Estabelecimento comercial", "Estabelecimento industrial", "Estado", "Estado de emergência", "Estado de necessidade",
   "Estado estrangeiro", "Estafeta", "Estágio", "Estaleiros temporários ou móveis", "Estatuto do trabalhador cooperante",
@@ -137,7 +137,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Honorários", "Horário de trabalho", "Horário flexível", "Hospital", "IAS", "Igreja", "Igualdade das partes", "Ilações",
   "Ilicitude", "Ilisão", "Impedimento", "Impenhorabilidade", "Imperatividade da lei", "Impossibilidade absoluta",
   "Impossibilidade definitiva", "Impossibilidade do cumprimento", "Impossibilidade objectiva", "Impossibilidade superveniente",
-  "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisões intercalares",
+  "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisions intercalares",
   "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incapacidade funcional", "Incapacidade grave",
   "Incapacidade para o exercício de outra profissão", "Incapacidade permanente absoluta",
   "Incapacidade permanente absoluta para o trabalho habitual", "Incapacidade permanente parcial", "Incapacidade temporária",
@@ -290,7 +290,6 @@ const SOCIAL_DESCRIPTORS_LIST = [
 
 function App() {
   const [db, setDb] = useState<Acordao[]>([]);
-  const [savedSearches, setSavedSearches] = useState<SearchResult[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [descriptors, setDescriptors] = useState<{social: string[], crime: string[], civil: string[]}>({
     social: Array.from(new Set(SOCIAL_DESCRIPTORS_LIST)).sort(),
@@ -302,17 +301,55 @@ function App() {
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [cachedFiles, setCachedFiles] = useState<File[]>([]);
+  
+  const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
+  const [isAiConnecting, setIsAiConnecting] = useState<boolean>(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
   };
 
-  // Extração dinâmica de juízes baseada no DB atual
+  useEffect(() => {
+    const checkAiKey = async () => {
+      const aistudio = window.aistudio || (window.parent as any)?.aistudio;
+      if (aistudio) {
+        try {
+          const hasKey = await aistudio.hasSelectedApiKey();
+          setIsAiConfigured(hasKey);
+        } catch (e) {
+          console.debug("A aguardar disponibilidade do AI Studio...");
+        }
+      }
+    };
+    checkAiKey();
+    const interval = setInterval(checkAiKey, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleOpenAiKeyDialog = async () => {
+    const aistudio = window.aistudio || (window.parent as any)?.aistudio;
+    
+    if (!aistudio) {
+        alert("O sistema de faturamento do Google AI Studio não foi detetado. Se está no Vercel, certifique-se de que o ambiente suporta o modelo individual.");
+        return;
+    }
+
+    try {
+      setIsAiConnecting(true);
+      await aistudio.openSelectKey();
+      setIsAiConfigured(true);
+    } catch (e) {
+      console.error("Falha ao abrir seletor de chaves:", e);
+    } finally {
+      setIsAiConnecting(false);
+    }
+  };
+
   useEffect(() => {
     const extracted = new Set<string>();
     db.forEach(ac => {
@@ -326,40 +363,32 @@ function App() {
 
   const handleMergeJudges = (main: string, others: string[]) => {
     const mainClean = main.trim();
-    const othersNormalized = others.map(o => o.trim().toLowerCase());
+    const othersLower = others.map(o => o.trim().toLowerCase());
 
     setDb(currentDb => {
-      const newDb = currentDb.map(ac => {
+      return currentDb.map(ac => {
         let changed = false;
-        
-        // Relator
         let newRelator = ac.relator.trim();
-        if (othersNormalized.includes(newRelator.toLowerCase())) {
+        if (othersLower.includes(newRelator.toLowerCase())) {
           newRelator = mainClean;
           changed = true;
         }
-        
-        // Adjuntos
         const newAdjuntos = ac.adjuntos.map(adj => {
           const adjTrimmed = adj.trim();
-          if (othersNormalized.includes(adjTrimmed.toLowerCase())) {
+          if (othersLower.includes(adjTrimmed.toLowerCase())) {
             changed = true;
             return mainClean;
           }
           return adjTrimmed;
         });
 
-        // Limpeza de duplicados e garantia de que relator não é adjunto
-        const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
-          .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
-
-        if (JSON.stringify(uniqueAdjuntos) !== JSON.stringify(ac.adjuntos) || newRelator !== ac.relator) {
-          changed = true;
+        if (changed) {
+            const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
+              .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
+            return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
         }
-
-        return changed ? { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos } : ac;
+        return ac;
       });
-      return [...newDb]; // Forçar nova referência para trigger de reatividade
     });
   };
 
@@ -431,7 +460,30 @@ function App() {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset para permitir carregar o mesmo ficheiro
+    e.target.value = ''; 
+  };
+
+  const handleLoadChatFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        if (parsed.chatSessions) {
+            setChatSessions(current => {
+                const existingIds = new Set(current.map(s => s.id));
+                const filteredNew = parsed.chatSessions.filter((s: ChatSession) => !existingIds.has(s.id));
+                return [...filteredNew, ...current];
+            });
+            alert("Chat carregado com sucesso.");
+        }
+      } catch (err) {
+        alert("Erro ao ler histórico.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const mainContent = onboardingStep === 'app' ? (
@@ -441,17 +493,35 @@ function App() {
           <div className="flex items-center gap-4">
             <ScaleIcon className="w-8 h-8 text-legal-100" />
             <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase">JurisAnalítica</h1>
-              <p className="text-[10px] text-legal-300 uppercase tracking-widest font-black">{legalArea || 'Local'}</p>
+              <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">JurisAnalítica</h1>
+              <p className="text-[9px] text-legal-400 uppercase tracking-widest font-black mt-1">Área {legalArea}</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => fileInputRef.current?.click()} className="bg-legal-800 hover:bg-legal-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 border border-legal-700 transition-all">
-              <FolderOpen className="w-4 h-4" /> Importar
+          <div className="flex gap-2 items-center">
+            
+            <button 
+                onClick={handleOpenAiKeyDialog}
+                disabled={isAiConnecting}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'} disabled:opacity-50`}
+            >
+                {isAiConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
+                {isAiConfigured ? 'Faturamento IA Ativo' : 'Ligar Faturamento IA'}
             </button>
-            <button onClick={handleSaveDb} className="bg-white text-legal-900 hover:bg-legal-50 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
-              <Save className="w-4 h-4" /> Backup
+
+            <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
+            
+            <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white transition-all" title="Importar Chat">
+                <History className="w-4 h-4" />
             </button>
+            
+            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
+                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white transition-all" title="Importar Base">
+                    <FolderOpen className="w-4 h-4" />
+                </button>
+                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all">
+                    <Save className="w-4 h-4" /> Backup
+                </button>
+            </div>
           </div>
         </div>
       </header>
@@ -460,7 +530,7 @@ function App() {
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
             {['process', 'search', 'chat'].map((tab: any) => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
+                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria IA'}
               </button>
             ))}
         </div>
@@ -471,7 +541,7 @@ function App() {
                 existingDB={db} 
                 onSetRootHandle={handleSetRoot} 
                 rootHandleName={rootHandleName} 
-                onCacheFiles={setCachedFiles} 
+                onCacheFiles={() => {}} 
                 onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
                 onAddJudges={setJudges} 
                 onMergeJudges={handleMergeJudges}
@@ -479,6 +549,7 @@ function App() {
                 availableDescriptors={descriptors[legalArea]}
                 legalArea={legalArea}
                 onUpdateDb={setDb}
+                onSaveDb={handleSaveDb}
               />
             )}
             {activeTab === 'search' && (
@@ -494,7 +565,15 @@ function App() {
               <ChatModule 
                 db={db} 
                 sessions={chatSessions} 
-                onSaveSession={s => setChatSessions(p => [s, ...p])} 
+                onSaveSession={s => setChatSessions(p => {
+                    const idx = p.findIndex(x => x.id === s.id);
+                    if (idx > -1) {
+                        const next = [...p];
+                        next[idx] = s;
+                        return next;
+                    }
+                    return [s, ...p];
+                })} 
                 onDeleteSession={(id) => setChatSessions(p => p.filter(s => s.id !== id))} 
                 onOpenPdf={openPdf}
               />
@@ -504,7 +583,9 @@ function App() {
     </div>
   ) : (
     <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50">
+      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-legal-400 to-blue-500"></div>
+          
           <div className="mb-10 flex justify-center">
             <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
               <ScaleIcon className="w-12 h-12 text-blue-500"/>
@@ -524,14 +605,28 @@ function App() {
                 </div>
                 <div>
                     <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sessão Local</div>
                 </div>
               </button>
             ))}
-            <div className="h-px bg-slate-700/50 my-2"></div>
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
-              <Upload className="w-4 h-4"/> Carregar Backup (.json)
-            </button>
+            <div className="h-px bg-slate-700/50 my-6"></div>
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white transition-all font-bold text-[9px] uppercase tracking-widest group">
+                    <Database className="w-5 h-5 text-blue-500"/> Base JSON
+                </button>
+                <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white transition-all font-bold text-[9px] uppercase tracking-widest group">
+                    <MessageSquare className="w-5 h-5 text-green-500"/> Chats JSON
+                </button>
+            </div>
+            
+            <div className="mt-8 pt-6 border-t border-slate-700/50 flex flex-col gap-3">
+                 <button onClick={handleOpenAiKeyDialog} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 transition-all">
+                    <Settings className="w-4 h-4"/> Configurar Faturamento de IA
+                 </button>
+                 <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="text-[9px] text-slate-500 font-bold uppercase flex items-center justify-center gap-1 hover:text-slate-400">
+                    Sobre Custos da API Google <ExternalLink className="w-3 h-3"/>
+                 </a>
+            </div>
           </div>
       </div>
     </div>
@@ -546,6 +641,13 @@ function App() {
         className="hidden" 
         accept=".json" 
         onChange={handleLoadDbFile}
+      />
+      <input 
+        type="file" 
+        ref={chatInputRef} 
+        className="hidden" 
+        accept=".json" 
+        onChange={handleLoadChatFile}
       />
     </>
   );

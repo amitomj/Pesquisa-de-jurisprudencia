@@ -49,8 +49,14 @@ export interface SearchResult {
 }
 
 declare global {
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
+    aistudio?: AIStudio;
   }
 }

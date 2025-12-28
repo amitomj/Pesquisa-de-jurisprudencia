@@ -3,11 +3,21 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
 /**
- * Helper to handle specific API errors like Rate Limit (429)
+ * Helper to handle specific API errors like Rate Limit (429) or Missing Entity
  */
-const handleApiError = (error: any) => {
+const handleApiError = async (error: any) => {
   console.error("Erro Gemini API:", error);
   const msg = error?.message || "";
+  
+  // Rules: If requested entity was not found, reset key via dialog
+  if (msg.includes("Requested entity was not found")) {
+      const aistudio = window.aistudio || (window.parent as any)?.aistudio;
+      if (aistudio) {
+          await aistudio.openSelectKey();
+          return "RETRY";
+      }
+  }
+
   if (msg.includes("429") || msg.toLowerCase().includes("quota exceeded") || msg.toLowerCase().includes("rate limit")) {
     return "API_LIMIT_REACHED";
   }
@@ -22,7 +32,9 @@ export const generateLegalAnswer = async (
   context: Acordao[]
 ): Promise<string> => {
   try {
+    // Create new instance to use updated key from dialog
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     const relevantContext = context.map(c => 
       `ID_REF: ${c.id}\nProcesso: ${c.processo}\nTipo: ${c.tipoDecisao}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 1500)}...`
     ).join('\n---\n');
@@ -50,9 +62,10 @@ ${question}`,
 
     return response.text || "Sem resposta baseada no contexto.";
   } catch (error: any) {
-    const errType = handleApiError(error);
-    if (errType === "API_LIMIT_REACHED") return "AVISO: Atingiu o limite de utilização da API (Quota Excedida). Por favor, aguarde alguns instantes antes de tentar novamente.";
-    return "Erro no processamento da IA.";
+    const errType = await handleApiError(error);
+    if (errType === "RETRY") return "A chave de faturamento expirou ou é inválida. O diálogo de seleção foi reaberto. Tente novamente após selecionar uma chave válida.";
+    if (errType === "API_LIMIT_REACHED") return "AVISO: Atingiu o limite de utilização da API (Quota Excedida). Por favor, aguarde alguns instantes.";
+    return "Erro no processamento da IA. Certifique-se de que ligou o seu faturamento individual no menu superior.";
   }
 };
 
@@ -89,7 +102,7 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
-    const errType = handleApiError(error);
+    const errType = await handleApiError(error);
     if (errType === "API_LIMIT_REACHED") return "API_LIMIT_REACHED";
     return null; 
   }
@@ -117,11 +130,7 @@ export const suggestDescriptorsWithAI = async (summary: string, availableDescrip
      });
      return response.text ? JSON.parse(response.text) : [];
   } catch (error) { 
-    const errType = handleApiError(error);
-    if (errType === "API_LIMIT_REACHED") {
-      alert("Atingiu o limite de utilização da API (Rate Limit). A operação foi interrompida.");
-      return [];
-    }
+    await handleApiError(error);
     return []; 
   }
 };
