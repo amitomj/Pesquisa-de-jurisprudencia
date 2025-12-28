@@ -1,19 +1,23 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info } from 'lucide-react';
+import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info, RefreshCw, AlertCircle } from 'lucide-react';
 import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
 
-// Função de normalização avançada para pesquisa difusa (ignore acentos, espaços extras, e grafias antigas/novas)
+/**
+ * Função de normalização difusa (Advanced Fuzzy)
+ * Ignora: acentos, espaços, caracteres especiais, grafias duplicadas e variações clássicas (ct/t, cc/c)
+ */
 const fuzzyNormalize = (str: string) => {
   if (!str) return "";
   return str
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "") // Remove acentos
     .toLowerCase()
-    .replace(/\s+/g, "") // Remove todos os espaços para apanhar "fa tura"
-    .replace(/ct/g, "t") // Normalização "factura" -> "fatura"
-    .replace(/cc/g, "c") // Normalização "acção" -> "ação"
+    .replace(/[\s\-\.\/]/g, "") // Remove espaços e separadores
+    .replace(/ct/g, "t") // factura -> fatura
+    .replace(/cc/g, "c") // acção -> ação
+    .replace(/(.)\1+/g, "$1") // Remove letras repetidas: ffaatturra -> fatura
     .trim();
 };
 
@@ -143,18 +147,17 @@ const SearchModule: React.FC<{
   });
   
   const [isProcessing, setIsProcessing] = useState<{id: string | 'batch', mode: string} | null>(null);
-  const [batchMode, setBatchMode] = useState<'sumario' | 'tags' | 'dados' | null>(null);
+  const [batchMode, setBatchMode] = useState<'sumario' | 'tags' | 'dados' | 'revisao' | null>(null);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [viewingSummary, setViewingSummary] = useState<string | null>(null);
 
   const filteredResults = useMemo(() => {
     return db.filter(item => {
-      // Filtros Básicos com Normalização Difusa
+      // Filtros Básicos
       if (filters.processo && !fuzzyNormalize(item.processo).includes(fuzzyNormalize(filters.processo))) return false;
       if (filters.relator && !fuzzyNormalize(item.relator).includes(fuzzyNormalize(filters.relator))) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyNormalize(a).includes(fuzzyNormalize(filters.adjunto)))) return false;
       
-      // Múltiplos Descritores
       if (filters.descritores.length > 0) {
         if (!filters.descritores.every(d => item.descritores.some(tag => fuzzyNormalize(tag) === fuzzyNormalize(d)))) return false;
       }
@@ -187,7 +190,6 @@ const SearchModule: React.FC<{
       
       if (filters.booleanOr) {
         const terms = filters.booleanOr.split(',').map(t => fuzzyNormalize(t.trim())).filter(t => t.length > 0);
-        // Se houver termos no OR, pelo menos um deve existir. Se não houver termos, o filtro não bloqueia.
         if (terms.length > 0 && !terms.some(t => fullTextFuzzy.includes(t))) return false;
       }
 
@@ -200,14 +202,27 @@ const SearchModule: React.FC<{
     });
   }, [db, filters]);
 
-  const runIA = async (item: Acordao, mode: 'sumario' | 'tags' | 'dados') => {
+  // Identificar documentos que realmente precisam de tratamento
+  const itemsNeedingProcessing = useMemo(() => {
+    if (!batchMode) return [];
+    if (batchMode === 'revisao') return filteredResults; // Revisão global ignora se está em falta
+    
+    return filteredResults.filter(item => {
+      if (batchMode === 'sumario') return !item.sumario || item.sumario.includes('não identificado');
+      if (batchMode === 'tags') return item.descritores.length === 0;
+      if (batchMode === 'dados') return item.data === 'N/D' || item.relator === 'Desconhecido';
+      return false;
+    });
+  }, [filteredResults, batchMode]);
+
+  const runIA = async (item: Acordao, mode: string) => {
     setIsProcessing({ id: item.id, mode });
     try {
-      if (mode === 'sumario' || mode === 'dados') {
+      if (mode === 'sumario' || mode === 'revisao' || mode === 'dados') {
         const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors);
         if (result && result !== "API_LIMIT_REACHED") {
           const updated = { ...item };
-          if (mode === 'sumario' && result.sumario) updated.sumario = result.sumario;
+          if ((mode === 'sumario' || mode === 'revisao') && result.sumario) updated.sumario = result.sumario;
           if (mode === 'dados') {
             if (result.relator && result.relator !== 'Desconhecido') updated.relator = result.relator;
             if (result.data && result.data !== 'N/D') updated.data = result.data;
@@ -226,13 +241,14 @@ const SearchModule: React.FC<{
   };
 
   const startBatchIA = async () => {
-    if (!batchMode) return;
+    if (!batchMode || itemsNeedingProcessing.length === 0) return;
+    
     setIsProcessing({ id: 'batch', mode: batchMode });
-    setBatchProgress({ current: 0, total: filteredResults.length });
+    setBatchProgress({ current: 0, total: itemsNeedingProcessing.length });
     
     let count = 0;
-    for (const item of filteredResults) {
-      if (isProcessing?.id !== 'batch') break; // Suporte a cancelamento básico
+    for (const item of itemsNeedingProcessing) {
+      if (isProcessing?.id !== 'batch' && count > 0) break; 
       await runIA(item, batchMode);
       count++;
       setBatchProgress(p => ({ ...p, current: count }));
@@ -240,7 +256,24 @@ const SearchModule: React.FC<{
     
     setIsProcessing(null);
     setBatchMode(null);
-    alert(`Processamento de ${count} documentos concluído.`);
+    alert(`Tratamento concluído: ${count} documentos processados.`);
+  };
+
+  const handleSelectBatchMode = (mode: 'sumario' | 'tags' | 'dados' | 'revisao') => {
+    // Verificar se há algo para tratar antes de mudar o estado visual
+    const count = filteredResults.filter(item => {
+      if (mode === 'sumario') return !item.sumario || item.sumario.includes('não identificado');
+      if (mode === 'tags') return item.descritores.length === 0;
+      if (mode === 'dados') return item.data === 'N/D' || item.relator === 'Desconhecido';
+      if (mode === 'revisao') return true;
+      return false;
+    }).length;
+
+    if (count === 0 && mode !== 'revisao') {
+      alert("Está tudo tratado! Não existem documentos com falhas para este critério.");
+      return;
+    }
+    setBatchMode(mode);
   };
 
   const resetFilters = () => setFilters({
@@ -271,7 +304,7 @@ const SearchModule: React.FC<{
                       <button onClick={() => setViewingSummary(null)} className="p-3 hover:bg-white rounded-full transition-all text-gray-400 hover:text-red-600 shadow-sm"><X className="w-6 h-6"/></button>
                   </div>
                   <div className="flex-1 overflow-y-auto p-12 custom-scrollbar">
-                      <p className="text-lg text-gray-800 font-serif leading-relaxed first-letter:text-5xl first-letter:font-black first-letter:mr-3 first-letter:float-left first-letter:text-legal-900 italic">
+                      <p className="text-lg text-gray-800 font-serif leading-relaxed italic">
                         {db.find(a => a.id === viewingSummary)?.sumario}
                       </p>
                   </div>
@@ -324,7 +357,7 @@ const SearchModule: React.FC<{
               </div>
             </div>
             <div>
-              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Vocabulário Controlado (Seleção)</label>
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Vocabulário Controlado</label>
               <MultiDescriptorSelect 
                 available={availableDescriptors} 
                 selected={filters.descritores} 
@@ -336,7 +369,7 @@ const SearchModule: React.FC<{
           <div className="pt-6 border-t space-y-4">
             <div className="flex items-center justify-between">
                 <label className="text-[9px] font-black text-legal-600 uppercase tracking-widest block">Lógica Booleana Difusa</label>
-                <div title="Ignora espaços, acentos e grafia" className="text-gray-300 cursor-help"><Info className="w-3.5 h-3.5"/></div>
+                <div title="Ignora espaços, acentos, ct/t, cc/c e letras repetidas" className="text-gray-300 cursor-help"><Info className="w-3.5 h-3.5"/></div>
             </div>
             <div className="space-y-3">
                <div className="relative">
@@ -354,44 +387,45 @@ const SearchModule: React.FC<{
             </div>
           </div>
         </div>
-        
-        <div className="p-6 bg-gray-50 border-t">
-            <div className="text-[9px] font-bold text-gray-400 uppercase text-center mb-3">Pesquisa automática ao digitar</div>
-            <button onClick={() => {}} className="w-full bg-legal-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all">
-                <Search className="w-4 h-4" /> Atualizar Lista
-            </button>
-        </div>
       </div>
 
       {/* Área de Resultados */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Barra de Ações em Massa - Reformulada */}
+        {/* Barra de Ações em Massa */}
         <div className="bg-white p-6 border-b flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
             <div className="flex items-center gap-4">
-                <span className="text-[10px] font-black uppercase text-gray-400">Total Encontrados: <span className="text-legal-900 bg-gray-100 px-3 py-1 rounded-full">{filteredResults.length}</span></span>
+                <span className="text-[10px] font-black uppercase text-gray-400">Encontrados: <span className="text-legal-900 bg-gray-100 px-3 py-1 rounded-full">{filteredResults.length}</span></span>
             </div>
             
             {isProcessing?.id === 'batch' ? (
                 <div className="flex-1 max-w-md mx-8">
                     <div className="flex justify-between items-end mb-2">
-                        <span className="text-[9px] font-black uppercase text-legal-600 animate-pulse">A processar {isProcessing.mode}...</span>
+                        <div className="flex items-center gap-2">
+                            <Loader2 className="w-3 h-3 animate-spin text-legal-600" />
+                            <span className="text-[9px] font-black uppercase text-legal-600 tracking-widest">Tratando {isProcessing.mode}...</span>
+                        </div>
                         <span className="text-[10px] font-black text-legal-900">{batchProgress.total - batchProgress.current} restantes</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
                         <div 
-                          className="h-full bg-legal-600 transition-all duration-500" 
+                          className="h-full bg-legal-600 transition-all duration-500 shadow-[0_0_10px_rgba(72,101,129,0.5)]" 
                           style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                         ></div>
                     </div>
                 </div>
             ) : batchMode ? (
                 <div className="flex items-center gap-3 animate-in slide-in-from-right-4">
-                    <span className="text-[10px] font-black uppercase text-orange-600">Pronto para {batchMode}:</span>
+                    <div className="bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-orange-600"/>
+                        <span className="text-[10px] font-black uppercase text-orange-800">
+                            {batchMode === 'revisao' ? `Revisar todos os ${filteredResults.length} sumários` : `${itemsNeedingProcessing.length} documentos com falhas em ${batchMode}`}
+                        </span>
+                    </div>
                     <button 
                         onClick={startBatchIA}
-                        className="bg-orange-600 text-white px-8 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-black transition-all"
+                        className="bg-legal-900 text-white px-8 py-2.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-black transition-all active:scale-95"
                     >
-                        <Play className="w-3.5 h-3.5 fill-current"/> Iniciar Processamento ({filteredResults.length})
+                        <Play className="w-3.5 h-3.5 fill-current"/> Iniciar Tratamento
                     </button>
                     <button 
                         onClick={() => setBatchMode(null)}
@@ -403,22 +437,29 @@ const SearchModule: React.FC<{
             ) : (
                 <div className="flex gap-2">
                     <button 
-                      onClick={() => setBatchMode('sumario')} 
-                      className="flex items-center gap-2 px-5 py-2.5 bg-orange-50 text-orange-700 rounded-xl text-[9px] font-black uppercase border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
+                      onClick={() => handleSelectBatchMode('dados')} 
+                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-[9px] font-black uppercase border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                     >
-                        <AlignLeft className="w-3.5 h-3.5"/> Tratar Sumários
+                        <Activity className="w-3.5 h-3.5"/> Metadados em falta
                     </button>
                     <button 
-                      onClick={() => setBatchMode('tags')} 
-                      className="flex items-center gap-2 px-5 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-[9px] font-black uppercase border border-purple-100 hover:bg-purple-600 hover:text-white transition-all shadow-sm"
+                      onClick={() => handleSelectBatchMode('sumario')} 
+                      className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-700 rounded-xl text-[9px] font-black uppercase border border-orange-100 hover:bg-orange-600 hover:text-white transition-all shadow-sm"
                     >
-                        <Tag className="w-3.5 h-3.5"/> Sugerir Tags
+                        <AlignLeft className="w-3.5 h-3.5"/> Sumários em falta
                     </button>
                     <button 
-                      onClick={() => setBatchMode('dados')} 
-                      className="flex items-center gap-2 px-5 py-2.5 bg-blue-50 text-blue-700 rounded-xl text-[9px] font-black uppercase border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                      onClick={() => handleSelectBatchMode('tags')} 
+                      className="flex items-center gap-2 px-4 py-2.5 bg-purple-50 text-purple-700 rounded-xl text-[9px] font-black uppercase border border-purple-100 hover:bg-purple-600 hover:text-white transition-all shadow-sm"
                     >
-                        <Activity className="w-3.5 h-3.5"/> Metadados IA
+                        <Tag className="w-3.5 h-3.5"/> Tags em falta
+                    </button>
+                    <div className="w-px bg-gray-200 mx-2"></div>
+                    <button 
+                      onClick={() => handleSelectBatchMode('revisao')} 
+                      className="flex items-center gap-2 px-4 py-2.5 bg-legal-900 text-white rounded-xl text-[9px] font-black uppercase shadow-md hover:bg-black transition-all"
+                    >
+                        <RefreshCw className="w-3.5 h-3.5"/> Revisão Global
                     </button>
                 </div>
             )}
@@ -454,13 +495,13 @@ const SearchModule: React.FC<{
                 <div className="grid grid-cols-1 md:grid-cols-[1fr,250px] gap-8">
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 text-[10px] font-black text-legal-700 uppercase tracking-widest opacity-60">
-                            <AlignLeft className="w-3.5 h-3.5" /> Excerto do Sumário
+                            <AlignLeft className="w-3.5 h-3.5" /> Sumário Jurídico
                         </div>
                         <div className="relative">
                             <p className="text-sm text-gray-700 font-serif italic leading-relaxed bg-gray-50/50 p-6 rounded-[2rem] border border-gray-50 line-clamp-4">
                                 {item.sumario}
                             </p>
-                            <button onClick={() => setViewingSummary(item.id)} className="absolute bottom-2 right-2 bg-white/80 backdrop-blur-sm p-2 rounded-xl text-[9px] font-black uppercase text-legal-600 border border-gray-100 hover:bg-legal-900 hover:text-white transition-all shadow-sm">Ler tudo</button>
+                            <button onClick={() => setViewingSummary(item.id)} className="absolute bottom-2 right-2 bg-white/80 backdrop-blur-sm p-2 rounded-xl text-[9px] font-black uppercase text-legal-600 border border-gray-100 hover:bg-legal-900 hover:text-white transition-all shadow-sm">Expandir</button>
                         </div>
                         <div className="flex flex-wrap gap-2 pt-2">
                             {item.descritores.map((tag, idx) => (

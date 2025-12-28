@@ -12,11 +12,47 @@ const cleanRunningText = (fullText: string): string => {
 };
 
 /**
- * Tenta extrair especificamente a secção de Fundamentação de Direito
- * Ignora o Relatório, os Factos e a Impugnação da Matéria de Facto.
+ * Tenta extrair o sumário baseando-se em marcadores específicos
+ * Procura nas primeiras 2 páginas e últimas 4 páginas.
  */
+const extractTargetedSummary = (pages: string[]): string => {
+  const numPages = pages.length;
+  // Focar nas primeiras 2 e últimas 4
+  const targetPages = [];
+  for (let i = 0; i < Math.min(2, numPages); i++) targetPages.push(pages[i]);
+  for (let i = Math.max(0, numPages - 4); i < numPages; i++) {
+    if (!targetPages.includes(pages[i])) targetPages.push(pages[i]);
+  }
+
+  const combinedText = targetPages.join('\n');
+
+  // Marcadores fornecidos pelo utilizador + variações comuns
+  const sumarioMarkers = [
+    /sumário:?/i,
+    /Sumário/i,
+    /segue\s+sumário\s+da\s+responsabilidade\s+da\s+relatora/i,
+    /Sumário\s+\(art\.\s*663º,\s*nº\s*7,\s*do\s*CPC\):?/i,
+    /Sumário\s+\(\s*elaborado\s+pela\s+relatora\s+nos\s+termos\s+do\s+nº7\s+do\s+art\.\s*663º\s+do\s+C\.P\.Civil\)/i,
+    /Sumário\s+da\s+responsabilidade\s+do\s+relator/i
+  ];
+
+  for (const marker of sumarioMarkers) {
+    const match = combinedText.match(marker);
+    if (match && match.index !== undefined) {
+      // Extrai até encontrar um marcador de fim de secção ou o fim do bloco
+      const start = match.index + match[0].length;
+      const sub = combinedText.substring(start);
+      const endMatch = sub.match(/\n\s*(DECISÃO|ACORDAM|RELATÓRIO|FUNDAMENTAÇÃO|I\.|1\.)/i);
+      const end = endMatch ? endMatch.index : 3000; // Limite de segurança
+      const candidate = sub.substring(0, end).trim();
+      if (candidate.length > 50) return cleanRunningText(candidate);
+    }
+  }
+
+  return "";
+};
+
 const extractLegalReasoning = (fullText: string): string => {
-  // 1. Encontrar o início da fundamentação de direito
   const startMarkers = [
     /FUNDAMENTAÇÃO\s+DE\s+DIREITO/i,
     /O\s+DIREITO/i,
@@ -26,7 +62,6 @@ const extractLegalReasoning = (fullText: string): string => {
     /APRECIAÇÃO\s+DO\s+RECURSO/i
   ];
 
-  // 2. Encontrar o fim (Decisão)
   const endMarkers = [
     /\n\s*DECISÃO\s*\n/i,
     /\n\s*DISPOSITIVO\s*\n/i,
@@ -44,7 +79,6 @@ const extractLegalReasoning = (fullText: string): string => {
     }
   }
 
-  // Se não encontrar início claro, pega a partir de 40% do texto (heurística)
   if (startIndex === -1) startIndex = Math.floor(fullText.length * 0.4);
 
   let endIndex = fullText.length;
@@ -56,30 +90,7 @@ const extractLegalReasoning = (fullText: string): string => {
     }
   }
 
-  let reasoning = fullText.substring(startIndex, endIndex);
-
-  // 3. Remover secções de Impugnação de Factos que por vezes estão dentro ou logo antes
-  const factImpugnationMarkers = [
-    /da\s+impugnação\s+da\s+matéria\s+de\s+facto/gi,
-    /recurso\s+da\s+matéria\s+de\s+facto/gi,
-    /factos\s+provados/gi,
-    /factos\s+não\s+provados/gi
-  ];
-
-  // Se o bloco extraído começar com análise de factos, tentamos saltar esse sub-bloco
-  factImpugnationMarkers.forEach(marker => {
-     const match = reasoning.match(marker);
-     if (match && match.index !== undefined && match.index < reasoning.length * 0.3) {
-        // Se encontrar menção a factos no início da fundamentação, 
-        // procuramos o próximo marcador de "Direito" dentro do bloco
-        const subRight = reasoning.substring(match.index + 50).search(/Direito|Mérito/i);
-        if (subRight !== -1) {
-            reasoning = reasoning.substring(match.index + 50 + subRight);
-        }
-     }
-  });
-
-  return reasoning.trim();
+  return fullText.substring(startIndex, endIndex).trim();
 };
 
 export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
@@ -87,19 +98,20 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   // @ts-ignore
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
+  const pagesText: string[] = [];
   let fullRawText = '';
   const numPages = pdf.numPages;
 
-  // Extraímos agora TODAS as páginas para análise profunda
   for (let i = 1; i <= numPages; i++) {
     const page = await pdf.getPage(i);
     const textContent = await page.getTextContent();
     // @ts-ignore
     const strings = textContent.items.map((item: any) => item.str);
-    fullRawText += strings.join(' ') + '\n';
+    const pageStr = strings.join(' ');
+    pagesText.push(pageStr);
+    fullRawText += pageStr + '\n';
   }
 
-  // Metadados continuam a ser procurados no topo/fim (usando os primeiros 4000 caracteres e últimos 4000)
   const headerText = fullRawText.substring(0, 8000);
   const footerText = fullRawText.substring(fullRawText.length - 8000);
   const metaSearchText = headerText + '\n' + footerText;
@@ -130,13 +142,17 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const processMatch = headerText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
   const processo = processMatch ? processMatch[1] : 'N/D';
 
-  let sumario = '';
-  const sumarioMatch = fullRawText.match(/Sumário:?\s*([\s\S]*?)(?=(Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Notas:|Bibliografia|$))/i);
-  if (sumarioMatch && sumarioMatch[1]) {
-      sumario = cleanRunningText(sumarioMatch[1]).substring(0, 5000);
+  // Tentativa focada de extração de sumário
+  let sumario = extractTargetedSummary(pagesText);
+
+  // Fallback para o método antigo se falhar
+  if (!sumario) {
+      const sumarioMatch = fullRawText.match(/Sumário:?\s*([\s\S]*?)(?=(Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Notas:|Bibliografia|$))/i);
+      if (sumarioMatch && sumarioMatch[1]) {
+          sumario = cleanRunningText(sumarioMatch[1]).substring(0, 5000);
+      }
   }
 
-  // O "Texto de Análise" agora é focado exclusivamente no Direito
   const fundamentacao = extractLegalReasoning(fullRawText);
 
   return {
@@ -148,7 +164,7 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     data: cleanText(data),
     sumario: sumario || "Sumário não identificado automaticamente.",
     descritores: [],
-    textoAnalise: cleanRunningText(fundamentacao), // Aqui reside o Direito purificado
+    textoAnalise: cleanRunningText(fundamentacao),
     textoCompleto: fullRawText,
     tipoDecisao
   };
