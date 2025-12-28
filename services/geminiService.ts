@@ -6,8 +6,6 @@ const handleApiError = async (error: any) => {
   console.error("Erro Gemini API:", error);
   const msg = error?.message || "";
   
-  // Rules: If the request fails with an error message containing "Requested entity was not found.", 
-  // reset the key selection state and prompt the user to select a key again via openSelectKey().
   if (msg.includes("Requested entity was not found")) {
       if (window.aistudio) {
           await window.aistudio.openSelectKey();
@@ -26,8 +24,6 @@ export const generateLegalAnswer = async (
   context: Acordao[]
 ): Promise<string> => {
   try {
-    // Rules: Create a new GoogleGenAI instance right before making an API call 
-    // to ensure it always uses the most up-to-date API key from the dialog.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const relevantContext = context.map(c => 
@@ -58,7 +54,7 @@ ${question}`,
     return response.text || "Sem resposta baseada no contexto.";
   } catch (error: any) {
     const errType = await handleApiError(error);
-    if (errType === "RETRY") return "A chave de IA expirou ou é inválida. O seletor de chaves foi aberto automaticamente. Por favor, tente novamente após selecionar uma nova chave.";
+    if (errType === "RETRY") return "A chave de IA expirou ou é inválida. Por favor, tente novamente após selecionar uma nova chave.";
     if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de API atingido. Aguarde um momento.";
     return "Erro no processamento da IA. Verifique se ligou a sua Chave API pessoal no cabeçalho.";
   }
@@ -92,6 +88,7 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
+    // Return specific error constant for UI handling if quota is reached
     const errType = await handleApiError(error);
     if (errType === "API_LIMIT_REACHED") return "API_LIMIT_REACHED";
     return null; 
@@ -113,7 +110,6 @@ export const suggestDescriptorsWithAI = async (summary: string, availableDescrip
      });
      return response.text ? JSON.parse(response.text) : [];
   } catch (error) { 
-    await handleApiError(error);
     return []; 
   }
 };
