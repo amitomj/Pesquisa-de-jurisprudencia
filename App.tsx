@@ -83,15 +83,15 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
   "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
-  "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
-  "Desprezo pelas regras de segurança", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
+  "Desconsideração da personality colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
+  "Desempregado de longa duração", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
   "Despacho de mero expediente", "Despacho do relator", "Despacho homologatório", "Despacho liminar", "Despacho normativo",
   "Despacho saneador", "Despacho sobre a admissão de recurso", "Despedimento", "Despedimento colectivo", "Despedimento de facto",
   "Despedimento ilícito", "Despedimento sem justa causa", "Despesas de deslocação", "Despesas de funeral", "Despesas de tratamento",
   "Destacamento de trabalhador", "Dever de apresentação de documentos", "Dever de assiduidade",
   "Dever de cooperação para a descoberta da verdade", "Dever de custódia", "Dever de fidelidade", "Dever de gestão processual",
-  "Dever de lealdade", "Dever de não concorrência", "Dever de obediência", "Dever de ocupação efectiva", "Dever de probidade",
+  "Dever de lealdade", "Dever de não concerciência", "Dever de obediência", "Dever de ocupação efectiva", "Dever de probidade",
   "Dever de respeito", "Dever de urbanidade", "Dever de zelo e diligência", "Deveres de informação", "Deveres do empregador",
   "Deveres laborais", "Deveres secundários", "Difamação", "Diferenças salariais", "Dilação", "Diligência de instrução",
   "Diminuição da retribuição", "Directiva comunitária", "Direito a férias", "Direito a pensão", "Direito à reforma",
@@ -264,7 +264,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Subsídio de turno", "Subsídio para a criação de próprio emprego", "Subsídio para readaptação da habitação",
   "Subsídio por elevada incapacidade permanente", "Subsídio por morte", "Substituição do tribunal recorrido",
   "Substituição temporária de trabalhador", "Sucessão de instrumentos de regulamentação colectiva", "Sucessão de leis no tempo",
-  "Sucessão na posição contratual", "Sucumbência", "Suspensão", "Suspensão da execução da coima", "Suspensão da instância",
+  "Sucessão na position contratual", "Sucumbência", "Suspensão", "Suspensão da execução da coima", "Suspensão da instância",
   "Suspensão do contrato de trabalho", "Suspensão do despedimento", "Suspensão do despedimento colectivo",
   "Suspensão do trabalho", "Suspensão preventiva", "Tacógrafo", "Taxa de juro", "Taxa de justiça", "Teleconferência",
   "Telecópia", "Telemóvel", "Temas da prova", "Tempestividade", "Tempo de deslocação", "Tempo de disponibilidade",
@@ -283,7 +283,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Tratamento subsequente ao acidente", "Treinador", "Tribunal Administrativo", "Tribunal Arbitral", "Tribunal Constitucional",
   "Tribunal da Relação", "Tribunal de Comarca", "Tribunal dos Conflitos", "Truck sistem", "União de facto", "União Europeia",
   "Unidade comercial de dimensão relevante", "Uniformização de jurisprudência", "Usos laborais", "Valor da causa",
-  "Valor do silêncio como meio declarativo", "Valor probatório", "Veículo automóvel", "Vencimento da dívida",
+  "Valor do silêncio como meio declarativo", "Valor probatório", "Veículo adaptado", "Veículo automóvel", "Vencimento da dívida",
   "Venda judicial", "Vendedor", "Vícios da vontade", "Videovigilância", "Vinculação de pessoa colectiva",
   "Violação de regras de segurança", "Violação do direito a férias", "Vontade real do declarante", "Whatsapp"
 ];
@@ -326,7 +326,7 @@ function App() {
 
   const handleMergeJudges = (main: string, others: string[]) => {
     const mainClean = main.trim();
-    const othersLower = others.map(o => o.trim().toLowerCase());
+    const othersNormalized = others.map(o => o.trim().toLowerCase());
 
     setDb(currentDb => {
       const newDb = currentDb.map(ac => {
@@ -334,7 +334,7 @@ function App() {
         
         // Relator
         let newRelator = ac.relator.trim();
-        if (othersLower.includes(newRelator.toLowerCase())) {
+        if (othersNormalized.includes(newRelator.toLowerCase())) {
           newRelator = mainClean;
           changed = true;
         }
@@ -342,23 +342,24 @@ function App() {
         // Adjuntos
         const newAdjuntos = ac.adjuntos.map(adj => {
           const adjTrimmed = adj.trim();
-          if (othersLower.includes(adjTrimmed.toLowerCase())) {
+          if (othersNormalized.includes(adjTrimmed.toLowerCase())) {
             changed = true;
             return mainClean;
           }
           return adjTrimmed;
         });
 
-        if (changed) {
-            // Limpeza de duplicados e garantia de que relator não é adjunto
-            const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
-              .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
-            
-            return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
+        // Limpeza de duplicados e garantia de que relator não é adjunto
+        const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
+          .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
+
+        if (JSON.stringify(uniqueAdjuntos) !== JSON.stringify(ac.adjuntos) || newRelator !== ac.relator) {
+          changed = true;
         }
-        return ac;
+
+        return changed ? { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos } : ac;
       });
-      return [...newDb]; // Forçar nova referência
+      return [...newDb]; // Forçar nova referência para trigger de reatividade
     });
   };
 
@@ -396,11 +397,7 @@ function App() {
        if (handle) {
           const file = await handle.getFile();
           window.open(URL.createObjectURL(file), '_blank');
-       } else {
-           alert("Ficheiro não encontrado na pasta selecionada.");
        }
-    } else {
-        alert("Por favor, selecione a pasta de acórdãos no separador Processamento.");
     }
   };
 
@@ -434,7 +431,7 @@ function App() {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; 
+    e.target.value = ''; // Reset para permitir carregar o mesmo ficheiro
   };
 
   const mainContent = onboardingStep === 'app' ? (
