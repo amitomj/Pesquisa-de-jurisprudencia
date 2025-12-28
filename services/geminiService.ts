@@ -17,9 +17,8 @@ export const generateLegalAnswer = async (
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    // Prioriza o Direito e o Sumário para a análise da IA, ignorando factos para evitar ruído
     const relevantContext = context.map(c => 
-      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nSumário: ${c.sumario}\nFUNDAMENTAÇÃO DE DIREITO (Isolada):\n${(c.fundamentacaoDireito || c.textoAnalise).substring(0, 4000)}`
+      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nSumário: ${c.sumario}\nFUNDAMENTAÇÃO DE DIREITO (Isolada):\n${(c.fundamentacaoDireito || c.textoCompleto).substring(0, 4000)}`
     ).join('\n---\n');
 
     const response = await ai.models.generateContent({
@@ -55,11 +54,19 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extrai metadados em JSON. 
-      DESCRITORES: Escolhe 3-5 desta lista: [${availableDescriptors.join(", ")}]
-      
-      TEXTO:
-      ${textContext}`,
+      contents: `Atua como um extrator de texto literal. 
+
+REGRAS CRÍTICAS PARA O SUMÁRIO:
+1. NÃO RESUMAS: O sumário deve ser EXTRAÍDO LITERALMENTE (letra a letra) do texto fornecido.
+2. LOCALIZAÇÃO: Procura por marcadores como "Sumário:", "Sumário da responsabilidade do relator:" ou equivalentes.
+3. SE NÃO EXISTIR: Se não encontrares um sumário explícito e literal, devolve OBRIGATORIAMENTE a frase: "Sumário não encontrado".
+4. É PROIBIDO criar um sumário novo baseado no resto do documento.
+
+DESCRITORES:
+Escolhe 3-5 descritores da lista oficial que melhor se adequem ao tema: [${availableDescriptors.join(", ")}]
+
+TEXTO DO DOCUMENTO (Segmentos do Início e Fim):
+${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -68,7 +75,7 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
             data: { type: Type.STRING },
             relator: { type: Type.STRING },
             adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            sumario: { type: Type.STRING },
+            sumario: { type: Type.STRING, description: "O sumário literal extraído ou 'Sumário não encontrado'." },
             descritores: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["data", "relator", "adjuntos", "sumario", "descritores"]

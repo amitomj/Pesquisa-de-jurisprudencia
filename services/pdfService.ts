@@ -4,9 +4,8 @@ import { Acordao } from '../types';
 const cleanText = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 const preserveStructuralText = (text: string): string => {
-  return text
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
+  // Preserva a estrutura mas limpa espaços excessivos
+  return text.trim();
 };
 
 const filterFactImpugnation = (text: string): string => {
@@ -53,10 +52,10 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
 
   const fullText = pagesText.join('\n');
   
-  // Regra de Pesquisa de Sumário: Primeiras 3 e Últimas 3 páginas
+  // REGRA: Pesquisa de sumário apenas nas primeiras 3 e últimas 3 páginas
   const firstThree = pagesText.slice(0, 3).join('\n');
   const lastThree = pagesText.slice(Math.max(0, numPages - 3)).join('\n');
-  const textForSummary = firstThree + '\n---PÁGINAS FINAIS---\n' + lastThree;
+  const contextForSummary = `[INÍCIO DO DOCUMENTO]\n${firstThree}\n\n[FIM DO DOCUMENTO]\n${lastThree}`;
 
   let relator = 'Desconhecido';
   let data = 'N/D';
@@ -82,13 +81,14 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const factosNaoProvadosMatch = fullText.match(/(?:Factos\s+não\s+Provados)([\s\S]*?)(?=(?:III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
   const direitoMatch = fullText.match(/(?:Fundamentação\s+de\s+Direito|O\s+Direito|III\.\s*Direito)([\s\S]*?)(?=(?:IV\.\s*|Decisão|Conclusão|$))/i);
 
-  // Extração Literal do Sumário conforme regras
+  // EXTRAÇÃO LITERAL DO SUMÁRIO
   let sumario = 'Sumário não encontrado';
-  const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*[I1]\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|---PÁGINAS FINAIS---|$))/i;
+  // Marcadores: Sumário, Sumário da responsabilidade do relator, etc.
+  const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*[I1]\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Dispositivo|$))/i;
   
-  const sumarioMatch = textForSummary.match(sumarioRegex);
+  const sumarioMatch = contextForSummary.match(sumarioRegex);
   if (sumarioMatch && sumarioMatch[1].trim().length > 10) {
-    sumario = preserveStructuralText(sumarioMatch[1]);
+    sumario = sumarioMatch[1].trim();
   }
 
   return {
@@ -100,7 +100,7 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     data: cleanText(data),
     sumario: sumario,
     descritores: [],
-    textoAnalise: fullText,
+    textoAnalise: contextForSummary, // Para a IA focada apenas no sumário
     textoCompleto: fullText,
     tipoDecisao,
     relatorio: relatorioMatch ? preserveStructuralText(relatorioMatch[1]) : '',
