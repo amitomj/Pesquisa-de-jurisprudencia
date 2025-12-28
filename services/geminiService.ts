@@ -2,63 +2,68 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-const getAIInstance = (apiKey: string) => {
-  if (!apiKey || apiKey.length < 10) {
-    throw new Error("API_KEY_NOT_SET");
+const handleApiError = (error: any) => {
+  console.error("Erro Gemini API:", error);
+  const msg = error?.message || "";
+  if (msg.includes("429") || msg.toLowerCase().includes("quota exceeded") || msg.toLowerCase().includes("rate limit")) {
+    return "API_LIMIT_REACHED";
   }
-  return new GoogleGenAI({ apiKey });
+  return "ERROR";
 };
 
 export const generateLegalAnswer = async (
-  apiKey: string,
   question: string,
   context: Acordao[]
 ): Promise<string> => {
   try {
-    const ai = getAIInstance(apiKey);
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // Otimizamos o contexto enviando a Fundamentação de Direito (textoAnalise)
+    // Se for muito longa, pegamos os primeiros 5000 caracteres de cada documento relevante
     const relevantContext = context.map(c => 
-      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 1000)}...`
+      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nSumário: ${c.sumario}\nFUNDAMENTAÇÃO DE DIREITO: ${c.textoAnalise.substring(0, 8000)}...`
     ).join('\n---\n');
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analisa os acórdãos fornecidos e responde à questão jurídica de forma técnica e fundamentada.
+      contents: `És um assistente jurídico de alto nível. Analisa a FUNDAMENTAÇÃO DE DIREITO dos acórdãos fornecidos para responder à questão.
 
-CONTEXTO JURISPRUDENCIAL:
+REGRAS CRÍTICAS:
+1. FOCO NO DIREITO: Ignora questões de facto. Concentra-te na interpretação jurídica e normas aplicadas.
+2. CITAÇÕES: Usa obrigatoriamente [ID_REF: uuid] ao referir uma tese.
+3. CONFLITOS: Se os tribunais decidirem de forma diferente sobre o mesmo tema, destaca isso na secção "### ⚠️ DIVERGÊNCIA JURISPRUDENCIAL".
+
+CONTEXTO SELECIONADO:
 ${relevantContext}
 
 QUESTÃO DO UTILIZADOR: 
 ${question}`,
       config: {
-        systemInstruction: "És um consultor jurídico sénior especializado em Direito Português. Responde de forma técnica, precisa e fundamentada.",
+        systemInstruction: "És um Consultor Jurídico Especializado. A tua missão é extrair a 'ratio decidendi' dos acórdãos, focando-te exclusivamente nos argumentos de direito e ignorando o relatório fáctico.",
         temperature: 0.1,
         thinkingConfig: { thinkingBudget: 4000 }
       }
     });
 
-    return response.text || "Não foi possível gerar uma resposta com base no contexto.";
+    return response.text || "Sem resposta baseada no contexto.";
   } catch (error: any) {
-    if (error.message === "API_KEY_NOT_SET") return "Configure a sua chave de API no botão 'Configurar IA' no topo da aplicação.";
-    console.error("Erro na consulta IA:", error);
-    return "Erro no processamento. Verifique a validade da sua chave de API.";
+    const errType = handleApiError(error);
+    if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de API atingido. Aguarde um momento.";
+    return "Erro no processamento da IA.";
   }
 };
 
-export const extractMetadataWithAI = async (apiKey: string, textContext: string): Promise<any> => {
+export const extractMetadataWithAI = async (textContext: string, availableDescriptors: string[]): Promise<any> => {
   try {
-    const ai = getAIInstance(apiKey);
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Analisa o texto do acórdão e extrai rigorosamente os metadados em JSON.
-REGRAS:
-1. SUMÁRIO: Texto integral do sumário jurisprudencial.
-2. DATA: Data da decisão (DD-MM-AAAA).
-3. MAGISTRADOS: Nome do Relator e nomes dos Adjuntos.
-4. DESCRITORES: Identifica os 3 a 5 temas ou descritores jurídicos principais (tags) relevantes para o caso. **IMPORTANTE: Não deixes este campo vazio.**
-5. Se um campo não for encontrado, usa "N/D".
-
-TEXTO:
-${textContext}`,
+      contents: `Extrai metadados em JSON. 
+      Foca-te em gerar um SUMÁRIO conciso mas juridicamente rico baseado na FUNDAMENTAÇÃO DE DIREITO fornecida.
+      Escolhe 3-5 DESCRITORES desta lista: [${availableDescriptors.join(", ")}]
+      
+      TEXTO:
+      ${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -76,7 +81,25 @@ ${textContext}`,
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
-    console.error("Erro na extração IA:", error);
-    return null;
+    return null; 
+  }
+};
+
+export const suggestDescriptorsWithAI = async (summary: string, availableDescriptors: string[]): Promise<string[]> => {
+  try {
+     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+     const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: `Lista 6 descritores da lista abaixo para este sumário jurídico.
+        LISTA: [${availableDescriptors.join(", ")}]
+        SUMÁRIO: ${summary}`,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
+     });
+     return response.text ? JSON.parse(response.text) : [];
+  } catch (error) { 
+    return []; 
   }
 };

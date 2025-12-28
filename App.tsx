@@ -6,14 +6,294 @@ import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
 import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
 
-const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
+const SOCIAL_DESCRIPTORS_LIST = [
+  "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
+  "Abuso de confiança", "Abuso do direito", "Acareação", "Acção de anulação e interpretação de cláusulas de CCT",
+  "Acção de cobrança de dívidas hospitalares", "Acção de desoneração", "Acção de impugnação judicial da regularidade e licitude do despedimento",
+  "Acção de impugnação da confidencialidade de informações ou da recusa da sua prestação", "Acção de impugnação de despedimento",
+  "Acção de impugnação de despedimento colectivo", "Acção de impugnação de sanção disciplinar", "Acção de liquidação e partilha de bens",
+  "Acção de reconhecimento da existência de contrato de trabalho", "Acção emergente de acidente de trabalho", "Acção de simples apreciação",
+  "Acção emergente de doença profissional", "Acção executiva", "Acção para cobrança de dívidas ou com idêntica finalidade",
+  "Acesso à carreira", "Acesso ao direito", "Acesso ao emprego e ao trabalho", "Acidente de trabalho", "Acidente de viação",
+  "Acidente em serviço", "Acidente in itinere", "Aclaração", "Acórdão uniformizador de jurisprudência", "Acordo",
+  "Acordo de empresa", "Acréscimo de actividade", "Actividade de segurança privada", "Actividade económica",
+  "Actividade lucrativa", "Actividade sazonal", "Actividade seguradora", "Actividade sindical", "Actividades perigosas",
+  "Acto da secretaria", "Acto inútil", "Acto processual", "Actualização", "Actualização da pensão", "Acumulação de funções",
+  "Adaptabilidade grupal", "Adaptabilidade individual", "Adaptabilidade por regulamentação colectiva", "Adopção",
+  "Administração Pública", "Administrador", "Admissibilidade de prova testemunhal", "Admissibilidade de recurso",
+  "Admoestação", "Advogado", "Agente de execução", "Agente único", "Agravamento", "Agressão", "Ajudante familiar",
+  "Ajudas de custo", "Ajudas técnicas", "Alargamento do período experimental", "Alçada do tribunal", "Alcoolemia",
+  "Alegações de recurso", "Alojamento", "Alta", "Alteração da causa de pedir", "Alteração da estrutura da retribuição",
+  "Alteração das circunstâncias", "Alteração de Estatutos", "Alteração de funções", "Alteração do contrato",
+  "Alteração do horário de trabalho", "Ambiguidade", "Âmbito do recurso", "Âmbito pessoal de aplicação", "Amnistia",
+  "Ampliação da matéria de facto", "Ampliação do âmbito do recurso", "Ampliação do pedido", "Analogia", "Análise crítica",
+  "Antecedentes disciplinares", "Antiguidade", "Anuidades", "Anulabilidade", "Anulação de acórdão", "Anulação de julgamento",
+  "Apelação", "Apensação de processos", "Aplicação da lei no tempo", "Aplicação da lei processual no tempo",
+  "Aplicação de contrato colectivo de trabalho", "Aplicação de lei estrangeira", "Aplicação do direito",
+  "Aplicação subsidiária do Código de Processo Civil", "Apoio judiciário", "Apólice uniforme", "Arbitragem",
+  "Arguição de nulidades", "Articulado motivador", "Articulado superveniente", "Ascendente", "Assédio", "Assédio horizontal",
+  "Assistente", "Assembleia de credores", "Assessor técnico", "Assistência a menores", "Assistência a pessoas com deficiência",
+  "Assistência de terceira pessoa", "Assistência hospitalar", "Associações de empregadores", "Associações sindicais",
+  "Assunção de dívida", "Atenuação especial da coima", "Audição do arguido", "Audiência de partes", "Audiência prévia",
+  "Autarquia local", "Auto de advertência", "Auto de não conciliação", "Auto de notícia", "Autonomia administrativa",
+  "Autonomia financeira", "Autorização administrativa", "Aviso de recepção", "Aviso prévio", "Baixa de categoria",
+  "Baixa por doença", "Bancário", "Banco de horas", "Base instrutória", "Beneficiários", "Benefício da excussão",
+  "Boa fé", "Boletim de alta", "Bombeiro", "Caducidade", "Caducidade de convenção colectiva de trabalho",
+  "Caducidade do contrato de trabalho", "Caducidade do direito de acção", "Caducidade do direito de aplicar a sanção",
+  "Caducidade do procedimento disciplinar", "Caixa Geral de Aposentações", "Cálculo da indemnização", "Cálculo da pensão",
+  "Cantinas escolares", "Capacidade judiciária", "Capacidade restante", "Cargo de direcção", "Carreira profissional",
+  "Cartão de crédito", "Carteira profissional", "Cartório Notarial", "Caso julgado", "Caso julgado formal",
+  "Caso julgado material", "Categoria profissional", "Caução", "Causa de pedir", "Causa justificativa", "Causa prejudicial",
+  "Cedência ocasional de trabalhador", "Cedente", "Cessação da comissão de serviço", "Cessação da empreitada",
+  "Cessação do contrato de trabalho", "Cessação por acordo", "Cessão da posição contratual", "Cessão de exploração de estabelecimento",
+  "Cessionário", "Cinto de segurança", "Circunstâncias atenuantes", "Cisão de empresa", "Citação", "Citação de sociedade",
+  "Citação prévia", "CITE", "Citius", "Classificação profissional", "Cláusula adicional", "Cláusula de mobilidade geográfica",
+  "Cláusula de remissão", "Cláusulas contratuais gerais", "Coacção moral", "Coligação activa", "Coligação de contratos",
+  "Coligação passiva", "Colisão de direitos", "Cominação", "Comissão arbitral", "Comissão de serviço", "Comissão de trabalhadores",
+  "Comissões", "Comparticipação do Estado", "Compensação", "Compensação de créditos", "Compensação global",
+  "Compensação monetária", "Competência hierárquica", "Competência internacional", "Competência material",
+  "Competência por conexão", "Competência territorial", "Complemento de reforma", "Complemento de subsídio de doença",
+  "Comportamento concludente", "Comportamento extra-laboral", "Compromisso arbitral", "Comunicação", "Comunicação da intenção de despedir",
+  "Concausalidade", "Conciliação", "Conclusões", "Concorrência de culpas", "Concorrência de instrumentos de regulamentação colectiva",
+  "Concorrência desleal", "Concurso", "Condenação em multa", "Condenação extra vel ultra petitum", "Condição resolutiva",
+  "Condição suspensiva", "Condições de trabalho", "Condomínio", "Confidencialidade de mensagens", "Confissão",
+  "Confissão do pedido", "Confissão judicial", "Conflito de competência", "Conflito de normas", "Confusão", "Conhecimento no saneador",
+  "Conhecimento oficioso", "Cônjuges", "Consentimento do trabalhador", "Consignação em depósito", "Constitucionalidade",
+  "Construção civil", "Consulado português", "Consulta do processo", "Consulta dos trabalhadores", "Consumação",
+  "Conta de custas", "Contagem de tempo de serviço", "Contestação", "Contra-alegações de recurso", "Contradição",
+  "Contradita", "Contra-ordenação laboral", "Contra-ordenação muito grave", "Contraprova", "Contratação colectiva",
+  "Contrato administrativo", "Contrato colectivo de trabalho", "Contrato de adesão", "Contrato de agência",
+  "Contrato de aprendizagem", "Contrato de avença", "Contrato de empreitada", "Contrato de formação", "Contrato de prestação de serviço",
+  "Contrato de seguro", "Contrato de tarefa", "Contrato de trabalho", "Contrato de trabalho a tempo parcial",
+  "Contrato de trabalho a termo certo", "Contrato de trabalho a termo incerto", "Contrato de trabalho a termo resolutivo",
+  "Contrato de trabalho com entidade pública", "Contrato de trabalho de muito curta duração", "Contrato de trabalho desportivo",
+  "Contrato de trabalho doméstico", "Contrato de trabalho dos profissionais de espectáculos", "Contrato de trabalho em funções públicas",
+  "Contrato de trabalho intermitente", "Contrato de trabalho plurilocalizado", "Contrato de trabalho temporário",
+  "Contrato de utilização", "Contrato-promessa de trabalho", "Contratos sucessivos", "Contribuições para a Segurança Social",
+  "Controlo informático", "Convalidação", "Convenção colectiva de trabalho", "Conversão da incapacidade temporária em permanente",
+  "Conversão do contrato", "Cooperativa", "Correio electrónico", "COVID-19", "Crédito de horas", "Crédito ilíquido",
+  "Crédito laboral", "Crédito não reconhecido", "Crédito privilegiado", "Crise empresarial", "Critérios de selecção", "Culpa",
+  "Culpa concorrente de terceiro", "Culpa da empresa utilizadora", "Culpa do empregador", "Culpa do sinistrado", "Culpa exclusiva",
+  "Culpa grave", "Culpa in contrahendo", "Cumulação de indemnizações", "Cumulação de pedidos", "Cúmulo jurídico", "Custas",
+  "Custos aleatórios", "Dados pessoais", "Dano", "Danos patrimoniais", "Danos não patrimoniais", "Decisão administrativa",
+  "Decisão condenatória", "Decisão disciplinar", "Decisão do Presidente do STJ", "Decisão final", "Decisão implícita",
+  "Decisão intercalar", "Decisão prematura", "Decisão surpresa", "Declaração de não renovação", "Declaração de renovação",
+  "Declaração inexacta", "Declaração negocial", "Declaração receptícia", "Declaração tácita", "Declaração unilateral",
+  "Declarações de parte", "Dedução de rendimentos auferidos após o despedimento", "Deficiência da gravação",
+  "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
+  "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
+  "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
+  "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
+  "Desprezo pelas regras de segurança", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
+  "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
+  "Despacho de mero expediente", "Despacho do relator", "Despacho homologatório", "Despacho liminar", "Despacho normativo",
+  "Despacho saneador", "Despacho sobre a admissão de recurso", "Despedimento", "Despedimento colectivo", "Despedimento de facto",
+  "Despedimento ilícito", "Despedimento sem justa causa", "Despesas de deslocação", "Despesas de funeral", "Despesas de tratamento",
+  "Destacamento de trabalhador", "Dever de apresentação de documentos", "Dever de assiduidade",
+  "Dever de cooperação para a descoberta da verdade", "Dever de custódia", "Dever de fidelidade", "Dever de gestão processual",
+  "Dever de lealdade", "Dever de não concorrência", "Dever de obediência", "Dever de ocupação efectiva", "Dever de probidade",
+  "Dever de respeito", "Dever de urbanidade", "Dever de zelo e diligência", "Deveres de informação", "Deveres do empregador",
+  "Deveres laborais", "Deveres secundários", "Difamação", "Diferenças salariais", "Dilação", "Diligência de instrução",
+  "Diminuição da retribuição", "Directiva comunitária", "Direito a férias", "Direito a pensão", "Direito à reforma",
+  "Direito à retribuição", "Direito ao trabalho", "Direito ao tratamento médico", "Direito ao trespasse", "Direito comunitário",
+  "Direito de acção", "Direito de crítica", "Direito de defesa", "Direito de escolha", "Direito de opção", "Direito de oposição",
+  "Direito de regresso", "Direito disciplinar", "Direito internacional", "Direitos de personalidade", "Direitos fundamentais",
+  "Direitos indisponíveis", "Dirigente sindical", "Discricionariedade", "Discriminação", "Dispensa da audiência prévia",
+  "Dispensa para amamentação", "Dispensa para consultas", "Dissolução de sociedade", "Diuturnidades", "Doação", "Documento",
+  "Documento autêntico", "Documento idóneo", "Documento particular", "Documento superveniente", "Doença profissional",
+  "Dolo", "Dono da obra", "Dupla conforme", "Dupla indemnização", "Duplo grau de jurisdição", "Duração do trabalho", "Efeito devolutivo",
+  "Efeito do recurso", "Efeito suspensivo", "Eficácia da declaração negocial", "Eficácia do acto", "Eficácia retroactiva",
+  "Eleição", "Eleito local", "Elemento subjectivo", "Embargos de executado", "Embargos de terceiro", "Empregador",
+  "Emprego-inserção", "Emprego-inserção +", "Empreitada", "Empresa de capitais privados", "Empresa de serviços de limpeza",
+  "Empresa de trabalho temporário", "Empresa familiar", "Empresa petrolífera", "Empresa pública", "Encerramento da empresa",
+  "Encerramento de estabelecimento comercial", "Enfermeiro", "Enriquecimento sem causa", "Ensino particular", "Ensino profissional",
+  "Ensino superior particular e cooperativo", "Entidade contratada pelo empregador", "Entidade executante",
+  "Entidade pública empresarial", "Entrega do capital da remição", "Equidade", "Equipamentos de trabalho", "Erro",
+  "Erro da secretaria judicial", "Erro de julgamento", "Erro material", "Erro na apreciação das provas", "Erro na declaração",
+  "Erro na forma do processo", "Erro na transmissão da declaração", "Erro sobre os motivos do negócio", "Especificação",
+  "Estabelecimento comercial", "Estabelecimento industrial", "Estado", "Estado de emergência", "Estado de necessidade",
+  "Estado estrangeiro", "Estafeta", "Estágio", "Estaleiros temporários ou móveis", "Estatuto do trabalhador cooperante",
+  "Evento organizado pelo empregador", "Evolução salarial", "Exame médico", "Excepção dilatória", "Excepção peremptória",
+  "Excesso de pronúncia", "Execução", "Execução de direitos irrenunciáveis", "Execução de sanção disciplinar",
+  "Execução de sentença", "Execução para prestação de facto", "Execução por coima", "Expectativa jurídica", "Expediente dilatório",
+  "Extinção de posto de trabalho", "Extinção de sociedade", "Extinção do contrato de trabalho", "Extinção do poder jurisdicional",
+  "Facility Services", "Facto constitutivo", "Facto duradouro", "Factor de bonificação 1,5", "Factos admitidos por acordo",
+  "Factos complementares", "Factos conclusivos", "Factos concretizadores", "Factos continuados", "Factos essenciais",
+  "Factos instrumentais", "Factos não alegados", "Factos não constantes da nota de culpa", "Factos notórios", "Factos pessoais",
+  "Factos supervenientes", "Facturas", "Falência", "Falsas declarações", "Falta da entidade responsável",
+  "Falta de apresentação do procedimento disciplinar", "Falta de aviso prévio", "Falta de citação", "Falta de contestação",
+  "Falta de fundamentação", "Falta de pagamento da retribuição", "Falta do réu", "Falta grave e indesculpável",
+  "Faltas injustificadas", "Faltas justificadas", "Familiares do trabalhador", "Farmácia", "Fase administrativa",
+  "Fase conciliatória", "Fase contenciosa", "Fase de negociações", "FAT", "Férias", "Férias judiciais", "Filiação sindical",
+  "Fixação da incapacidade", "Fixação judicial da retribuição", "Folhas de férias", "Fontes de direito", "Força maior",
+  "Força probatória", "Força vinculativa", "Forma do contrato", "Forma do processo", "Forma escrita", "Formação", "Formação profissional",
+  "Formalidades ad probationem", "Formalidades ad substantiam", "Formulário", "Fraude à lei", "Fundação", "Função pública",
+  "Fundamentação", "Fundamentação de direito", "Fundamentação de facto", "Fundo de compensação do trabalho",
+  "Fundo de garantia de compensação do trabalho", "Fundo de pensões", "Fusão de empresas", "Futebolista profissional",
+  "Garantia autónoma", "Garantia bancária", "Garantia de defesa", "Garantia do pagamento", "Garantias do trabalhador",
+  "Genérico agrícola", "Gerente", "Gestor público", "GPS", "Graduação de créditos", "Grandes superfícies", "Gratificação",
+  "Gratificação extraordinária", "Gravação da audiência", "Gravação da prova", "Gravidade da infracção", "Greve",
+  "Grupo de empresas", "Habilitação de herdeiros", "Herança indivisa", "Homologação de deliberação da assembleia de credores",
+  "Honorários", "Horário de trabalho", "Horário flexível", "Hospital", "IAS", "Igreja", "Igualdade das partes", "Ilações",
+  "Ilicitude", "Ilisão", "Impedimento", "Impenhorabilidade", "Imperatividade da lei", "Impossibilidade absoluta",
+  "Impossibilidade definitiva", "Impossibilidade do cumprimento", "Impossibilidade objectiva", "Impossibilidade superveniente",
+  "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisões intercalares",
+  "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incapacidade funcional", "Incapacidade grave",
+  "Incapacidade para o exercício de outra profissão", "Incapacidade permanente absoluta",
+  "Incapacidade permanente absoluta para o trabalho habitual", "Incapacidade permanente parcial", "Incapacidade temporária",
+  "Incapacidade temporária absoluta", "Incapacidade temporária superior a dezoito meses", "Incidentes da instância",
+  "Incompetência absoluta", "Incompetência relativa", "Inconstitucionalidade", "Incumprimento do contrato",
+  "Incumprimento parcial", "Incumprimento por facto de terceiro", "Indeferimento liminar", "Indeferimento tácito",
+  "Indemnização", "Indemnização de antiguidade", "Indemnização por falta de aviso prévio",
+  "Indemnização por incumprimento de obrigações laborais", "Indeterminabilidade", "Indeterminação do objecto",
+  "Indícios de subordinação jurídica", "Indivisibilidade", "Ineptidão da petição inicial", "Informação e consulta",
+  "Informação genética", "Infracção continuada", "Infracção disciplinar", "Infracção estradal", "Início de laboração",
+  "Inimputabilidade", "Injúrias", "Inquérito", "Inquérito prévio", "Inquirição de testemunhas", "Insolvência", "Interpelação",
+  "Intervalo de descanso", "Instituição Particular de Solidariedade Social", "Instituições de crédito",
+  "Instituto de Segurança Social", "Instituto do Emprego e Formação Profissional", "Instituto Público", "Instrução técnica",
+  "Instrutor", "Interesse em agir", "Interesse imaterial", "Interesse público", "Interesses de particular relevância social",
+  "Internet", "Interposição de recurso", "Interpretação", "Interpretação analógica", "Interpretação conforme à Constituição",
+  "Interpretação da declaração negocial", "Interpretação da lei", "Interpretação de convenção colectiva de trabalho",
+  "Interpretação de sentença", "Interpretação do negócio jurídico", "Interrupção da instância", "Interrupção da prescrição",
+  "Intervenção acessória", "Intervenção de terceiros", "Intervenção principal", "Inutilidade superveniente da lide",
+  "Invalidade", "Invalidade do procedimento disciplinar", "Invalidade parcial", "Inversão do contencioso", "Inversão do ónus da prova",
+  "IRCT", "Irredutibilidade da retribuição", "Irregularidade", "Irregularidade processual", "Irrevogabilidade", "IRS", "Isenção",
+  "Isenção de horário de trabalho", "Jogador de futebol", "Jornalista", "Juízo pericial", "Juízos Cíveis", "Juízos do Trabalho",
+  "Julgamento", "Julgamento ampliado", "Junção de documento", "Junção do procedimento disciplinar", "Junta médica",
+  "Juros de mora", "Jus variandi", "Justa causa de despedimento", "Justa causa de resolução", "Justo impedimento", "Lacuna",
+  "Lançamento de nova actividade", "Lapso manifesto", "Lar de terceira idade", "Lay-off", "Legitimidade", "Legitimidade activa",
+  "Legitimidade passiva", "Lei aplicável", "Lei do Orçamento de Estado", "Lei especial", "Lei interpretativa",
+  "Lesão de interesses patrimoniais sérios", "Liberdade contratual", "Liberdade de escolha de profissão",
+  "Liberdade de expressão e de opinião", "Licença ilimitada", "Licença parental", "Licença sem vencimento de longa duração",
+  "Limite de idade", "Limite máximo da pena", "Limites à duração do trabalho", "Limites da condenação", "Liquidação",
+  "Liquidação de sentença", "Liquidatário", "Litigância de má fé", "Litisconsórcio", "Litisconsórcio necessário",
+  "Litisconsórcio voluntário", "Livrete individual de controlo", "Local de pagamento", "Local de refeição", "Local de trabalho",
+  "Má fé", "Mandato", "Mandato forense", "Massa insolvente", "Matéria de direito", "Matéria de facto", "Mediação",
+  "Medida da coima", "Meios de prova", "Meios de vigilância a distância", "Melhoria da aplicação do direito", "Menor",
+  "Microempresa", "Ministro do culto", "Mobbing", "Mobilidade funcional", "Mora", "Morte do empregador", "Morte do trabalhador",
+  "Motivação", "Motivo de força maior", "Motorista", "Mudança do estabelecimento", "Multa", "Músico", "Não admissão do recurso",
+  "Natureza jurídica", "Necessidade atendível", "Negligência consciente", "Negligência grosseira", "Negligência médica",
+  "Negócio formal", "Nexo de causalidade", "Nomeação de patrono", "Norma imperativa", "Nota de culpa", "Notificação",
+  "Notificação entre advogados", "Notificação para pagamento de multa", "Novação", "Novo julgamento", "Nulidade",
+  "Nulidade da estipulação do termo", "Nulidade de acórdão", "Nulidade de cláusula", "Nulidade de despacho",
+  "Nulidade de sentença", "Nulidade do contrato", "Nulidade insanável", "Nulidade por falta de forma", "Nulidade processual",
+  "Objecto do contrato de seguro", "Objecto do litígio", "Objecto do negócio", "Objecto do recurso",
+  "Obras na residência do sinistrado", "Obrigação de indemnização", "Obrigação fiscal", "Obrigação ilíquida",
+  "Obrigação natural", "Obrigação voluntária", "Obrigatoriedade de pagamento", "Obscuridade", "Ofensas à honra do trabalhador",
+  "Oficial de justiça", "Omissão de gravação da prova", "Omissão de pronúncia", "Ónus da prova", "Ónus de alegação",
+  "Ónus de concluir", "Oposição", "Oposição à execução", "Oposição à liquidação", "Oposição à reintegração",
+  "Oposição de acórdãos", "Oposição entre os fundamentos e a decisão", "Ordem de julgamento", "Ordem de serviço",
+  "Ordem escrita", "Ordem legítima", "Ordem pública internacional", "Órgãos de administração", "Órgãos de fiscalização",
+  "Outsourcing", "Pacto de desaforamento", "Pacto de não concorrência", "Pacto de permanência", "Pacto privativo de jurisdição",
+  "Pagamento", "Pagamento de retribuições intercalares pelo Estado", "Pagamento em prestações", "Parecer da CITE",
+  "Parecer do Instituto do Emprego e Formação Profissional", "Parecer do Ministério Público", "Parecer do Sindicato",
+  "Parecer técnico", "Parentalidade", "Património autónomo", "Participação de acidente de trabalho", "Patrocínio oficioso",
+  "Pedido", "Pedido de juros", "Pedido genérico", "Pedido principal", "Pedido subsidiário", "Pedidos alternativos", "Penhora",
+  "Pensão", "Pensão complementar de reforma", "Pensão de reduzido montante", "Pensão de reforma", "Pensão de sobrevivência",
+  "Pensão por incapacidade", "Pensão por morte", "Pensão provisória", "Perda de local de trabalho", "Período de condução",
+  "Período de repouso", "Período de funcionamento", "Período experimental", "Período normal de trabalho", "PER",
+  "Personalidade judiciária", "Pessoa colectiva", "Petição deficiente", "Petição inicial", "Plataforma digital",
+  "Pluralidade de empregadores", "Pluralidade de entidades responsáveis", "Pluralidade subjectiva subsidiária", "Pluriemprego",
+  "Poder de direcção", "Poder disciplinar", "Poder discricionário", "Poderes da Relação", "Poderes de representação",
+  "Poderes do juiz", "Poderes do Supremo Tribunal de Justiça", "Poderes do tribunal", "Polivalência funcional",
+  "Portaria de extensão", "Portaria de Regulamentação do Trabalho para os trabalhadores administrativos", "Posto de trabalho",
+  "Prática disciplinar", "Praticante desportivo", "Prazo", "Prazo de caducidade", "Prazo de interposição do recurso",
+  "Prazo de propositura da acção", "Prazo judicial", "Predisposição patológica", "Preferência", "Prejuízo sério", "Prémio",
+  "Prémio de assiduidade", "Prémio de desempenho", "Prémio de produtividade", "Prémio fixo", "Prémio TIR", "Prémio variável",
+  "Pré-reforma", "Prescrição", "Prescrição da infracção", "Prescrição de créditos", "Prescrição extintiva",
+  "Prestação suplementar", "Prestações em espécie", "Prestações médicas e medicamentosas", "Prestações periódicas",
+  "Prestações por doença", "Presunção de abandono", "Presunção de aceitação do despedimento", "Presunção de culpa",
+  "Presunção de inexistência de justa causa", "Presunção de laboralidade", "Presunção de notificação", "Presunção juris et de jure",
+  "Presunção juris tantum", "Presunções", "Presunções judiciais", "Presunções legais", "Preterição do tribunal arbitral",
+  "PREVPAP", "Primado do direito da União Europeia", "Princípio da adequação formal", "Princípio da aquisição processual",
+  "Princípio da concentração da defesa", "Princípio da confiança", "Princípio da cooperação", "Princípio da economia processual",
+  "Princípio da filiação", "Princípio da igualdade", "Princípio da indivisibilidade da confissão",
+  "Princípio da interpretação conforme o direito comunitário", "Princípio da irreversibilidade", "Princípio da legalidade",
+  "Princípio da liberdade de desvinculação", "Princípio da livre apreciação da prova", "Princípio da preclusão",
+  "Princípio da proporcionalidade", "Princípio da segurança no emprego", "Princípio do contraditório", "Princípio do dispositivo",
+  "Princípio do pedido", "Princípio do tratamento mais favorável", "Princípio geral de aproveitamento do processado",
+  "Privilégio creditório", "Procedimento", "Procedimento disciplinar", "Procedimento disciplinar incompleto",
+  "Procedimento cautelar", "Processo comum", "Processo de contra-ordenação", "Processo de insolvência", "Processo de trabalho",
+  "Processo equitativo", "Processo especial de recuperação de empresa", "Processo executivo", "Processo penal",
+  "Processo urgente", "Procuração", "Professor", "Professor universitário", "Progressão na carreira", "Progressão salarial",
+  "Progressão na categoria", "Proibição de discriminação", "Proibição de prova", "Proibição do lock-out",
+  "Promessa de contrato de trabalho", "Proporcionais de férias e de subsídios de férias e de Natal", "Propositura da acção",
+  "Prorrogação do prazo", "Protecção contra quedas", "Protecção da maternidade e paternidade", "Protecção de dados pessoais",
+  "Protocolo", "Prova", "Prova documental", "Prova gravada", "Prova pericial", "Prova plena", "Prova por confissão",
+  "Prova por declarações de parte", "Prova por documentos particulares", "Prova proibida", "Prova testemunhal",
+  "Prova vinculada", "Publicidade", "Qualificação jurídica", "Quantia exequenda", "Quantum indemnizatório", "Queda em altura",
+  "Questão de direito", "Questão de facto", "Questão nova", "Questão prejudicial", "Quitação", "Ratificação",
+  "Reabilitação profissional", "Recibo de quitação", "Recidiva", "Reclamação", "Reclamação de créditos",
+  "Reclamação para a Conferência", "Reclamação ulterior de créditos de acidente de trabalho", "Reclassificação",
+  "Reconhecimento da dívida", "Reconstituição natural", "Reconvenção", "Reconversão profissional", "Rectificação de erros materiais",
+  "Rectificação de pensão", "Rectificação de sentença", "Recurso", "Recurso de apelação", "Recurso de contra-ordenação",
+  "Recurso de revisão", "Recurso de revista", "Recurso extraordinário para uniformização de jurisprudência", "Recurso independente",
+  "Recurso laboral", "Recurso para o Supremo Tribunal de Justiça", "Recurso per saltum", "Recurso subordinado", "Recusa de cooperação",
+  "Recusa de assistência médica", "Recusa de tratamento", "Redução do contrato", "Redução do período normal de trabalho",
+  "Reembolso de despesas", "Reembolsos à Segurança Social", "Reenvio prejudicial", "Reestruturação de empresa", "Refeições",
+  "REFER", "Reforma", "Reforma antecipada", "Reforma da decisão", "Reforma de acórdão", "Reforma por invalidez",
+  "Reforma por velhice", "Reformatio in pejus", "Regime disciplinar", "Regime geral da Segurança Social", "Regime transitório",
+  "Registo", "Regulamentação colectiva", "Regulamento (CE) n.º 561/2006", "Regulamento (UE) n.º 165/2014", "Regulamento interno",
+  "Reinserção profissional", "Reincidência", "Reintegração", "Rejeição de recurso", "Relação de emprego",
+  "Relação jurídica administrativa", "Relações de trabalho plurilocalizadas", "Relações entre fontes de regulação",
+  "Remição de pensão", "Remição facultativa", "Remição parcial", "Remissão abdicativa", "Remissão para documentos",
+  "Renovação da instância", "Renovação da prova", "Renovação do contrato", "Renúncia", "Repetição do julgamento", "Repouso",
+  "Representante", "Representante sindical", "Repristinação", "Requerimento executivo", "Requisição", "Requisitos",
+  "Reserva da vida privada", "Residência", "Residência ocasional", "Resolução do contrato de trabalho", "Responsabilidade",
+  "Responsabilidade agravada", "Responsabilidade civil", "Responsabilidade civil emergente de acidente de trabalho",
+  "Responsabilidade contratual", "Responsabilidade criminal", "Responsabilidade da entidade contratante",
+  "Responsabilidade do empregador", "Responsabilidade do trabalhador", "Responsabilidade disciplinar",
+  "Responsabilidade extracontratual", "Responsabilidade objectiva", "Responsabilidade pré-contratual", "Responsabilidade solidária",
+  "Responsabilidade subsidiária", "Resposta à contestação", "Resposta à nota de culpa", "Restrição do objecto do recurso",
+  "Retribuição", "Retribuição de férias", "Retribuição de referência", "Retribuição em espécie", "Retribuição ilíquida",
+  "Retribuição líquida", "Retribuição mínima mensal garantida", "Retribuição mista", "Retribuição variável", "Retribuição-base",
+  "Retribuições em dívida", "Retribuições intercalares", "Revalidação do contrato nulo", "Revelia", "Reversão",
+  "Revisão de incapacidade", "Revisão de sentença estrangeira", "Revista excepcional", "Revogação", "Revogação da sentença",
+  "Revogação do contrato de trabalho", "RGPD", "Rotação de cheques", "RTP", "Sanção abusiva", "Sanção acessória",
+  "Sanção disciplinar", "Sanção pecuniária compulsória", "Saneador-sentença", "Sector bancário", "Sector económico de atividade",
+  "Sector empresarial do Estado", "Sector portuário", "Segredo comercial", "Segredo das telecomunicações", "Segredo profissional",
+  "Segurança e saúde no trabalho", "Segurança no emprego", "Segurança Social", "Seguro", "Seguro de acidentes de trabalho",
+  "Seguro de vida", "Sentença", "Sentença criminal", "Sentença homologatória", "Serviço militar obrigatório",
+  "Serviços consentidos pelo empregador", "Serviços de Segurança e Saúde no Trabalho", "Serviços de vigilância e segurança",
+  "Serviços espontâneos", "Serviços essenciais", "Serviços mínimos", "Sigilo bancário", "Simulação", "Sindicato", "Sobrevigência",
+  "Sociedade", "Sociedade anónima", "Sociedades em relação de participações recíprocas, de domínio ou de grupo",
+  "Sociedade por quotas", "Sociedade unipessoal", "Sócio gerente", "Subcontratação", "Subempreitada", "Subordinação jurídica",
+  "Subrogação", "Subsidiariedade", "Subsídio de agente único", "Subsídio de alimentação", "Subsídio de desemprego",
+  "Subsídio de deslocação", "Subsídio de disponibilidade", "Subsídio de doença", "Subsídio de exclusividade", "Subsídio de férias",
+  "Subsídio de função", "Subsídio de funeral", "Subsídio de isenção de horário de trabalho", "Subsídio de Natal",
+  "Subsídio de turno", "Subsídio para a criação de próprio emprego", "Subsídio para readaptação da habitação",
+  "Subsídio por elevada incapacidade permanente", "Subsídio por morte", "Substituição do tribunal recorrido",
+  "Substituição temporária de trabalhador", "Sucessão de instrumentos de regulamentação colectiva", "Sucessão de leis no tempo",
+  "Sucessão na posição contratual", "Sucumbência", "Suspensão", "Suspensão da execução da coima", "Suspensão da instância",
+  "Suspensão do contrato de trabalho", "Suspensão do despedimento", "Suspensão do despedimento colectivo",
+  "Suspensão do trabalho", "Suspensão preventiva", "Tacógrafo", "Taxa de juro", "Taxa de justiça", "Teleconferência",
+  "Telecópia", "Telemóvel", "Temas da prova", "Tempestividade", "Tempo de deslocação", "Tempo de disponibilidade",
+  "Tempo de trabalho", "Tentativa de conciliação", "Testemunha", "Testes e exames médicos", "Título executivo", "Tomador do seguro",
+  "Trabalhador à procura de primeiro emprego", "Trabalhador com capacidade de trabalho reduzida", "Trabalhador com deficiência",
+  "Trabalhador com doença crónica", "Trabalhador com responsabilidades familiares", "Trabalhador cooperante",
+  "Trabalhador de consulado", "Trabalhador de empresa petrolífera", "Trabalhador de seguros", "Trabalhador estudante",
+  "Trabalhador estrangeiro", "Trabalhador eventual", "Trabalhador independente", "Trabalhador no estrangeiro", "Trabalhador menor",
+  "Trabalhador não sindicalizado", "Trabalhador permanente", "Trabalhador subordinado", "Trabalhador temporário",
+  "Trabalhadora grávida", "Trabalho a bordo", "Trabalho ao domingo", "Trabalho aparentemente autónomo", "Trabalho de curta duração",
+  "Trabalho efectivo", "Trabalho em dias de descanso", "Trabalho em feriado", "Trabalho igual salário igual", "Trabalho nocturno",
+  "Trabalho no domicílio", "Trabalho ocasional", "Trabalho por turnos", "Trabalho portuário", "Trabalho rural", "Trabalho sazonal",
+  "Trabalho suplementar", "Trabalho voluntário", "Trajecto normal", "Transacção", "Transferência definitiva de trabalhador",
+  "Transferência temporária de trabalhador", "Trânsito em julgado", "Transmissão da posição contratual", "Transmissão de dívida",
+  "Transmissão de estabelecimento", "Transmissão parcial de estabelecimento", "Transporte internacional de mercadorias por estrada",
+  "Tratamento subsequente ao acidente", "Treinador", "Tribunal Administrativo", "Tribunal Arbitral", "Tribunal Constitucional",
+  "Tribunal da Relação", "Tribunal de Comarca", "Tribunal dos Conflitos", "Truck sistem", "União de facto", "União Europeia",
+  "Unidade comercial de dimensão relevante", "Uniformização de jurisprudência", "Usos laborais", "Valor da causa",
+  "Valor do silêncio como meio declarativo", "Valor probatório", "Veículo automóvel", "Vencimento da dívida",
+  "Venda judicial", "Vendedor", "Vícios da vontade", "Videovigilância", "Vinculação de pessoa colectiva",
+  "Violação de regras de segurança", "Violação do direito a férias", "Vontade real do declarante", "Whatsapp"
+];
 
 function App() {
   const [db, setDb] = useState<Acordao[]>([]);
   const [savedSearches, setSavedSearches] = useState<SearchResult[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [descriptors, setDescriptors] = useState<{social: string[], crime: string[], civil: string[]}>({
-    social: Array.from(new Set(DEFAULT_SOCIAL)).sort(),
+    social: Array.from(new Set(SOCIAL_DESCRIPTORS_LIST)).sort(),
     crime: [],
     civil: []
   });
@@ -24,75 +304,62 @@ function App() {
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   
-  // BYOK: Bring Your Own Key implementation
-  const [userApiKey, setUserApiKey] = useState<string>(() => {
-    return localStorage.getItem('juris_gemini_api_key') || '';
-  });
-  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
-  
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setHasApiKey(userApiKey.trim().length >= 20);
-  }, [userApiKey]);
-
-  const handleSetupKey = () => {
-    const currentMsg = userApiKey ? `\n\n(A sua chave atual termina em ...${userApiKey.slice(-4)})` : '';
-    const key = window.prompt(
-      'Cole aqui a sua Gemini API Key.\nEsta chave será guardada apenas neste browser para processar os seus documentos.' + currentMsg,
-      userApiKey
-    );
-
-    if (key === null) return; // Cancelado
-
-    const trimmed = key.trim();
-    if (trimmed && trimmed.length < 20) {
-      alert('A chave introduzida parece ser demasiado curta ou inválida.');
-      return;
-    }
-
-    setUserApiKey(trimmed);
-    if (trimmed) {
-      localStorage.setItem('juris_gemini_api_key', trimmed);
-    } else {
-      localStorage.removeItem('juris_gemini_api_key');
-    }
-  };
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
   };
 
-  const updateJudgesList = (currentDb: Acordao[]) => {
-    const extracted = new Set<string>();
-    currentDb.forEach(ac => {
-      if (ac.relator && ac.relator !== 'Desconhecido') extracted.add(ac.relator.trim());
-      ac.adjuntos.forEach(adj => { if (adj && adj !== 'Nenhum') extracted.add(adj.trim()); });
-    });
-    setJudges(Array.from(extracted).sort());
-  };
-
+  // Extração dinâmica de juízes baseada no DB atual
   useEffect(() => {
-    updateJudgesList(db);
+    const extracted = new Set<string>();
+    db.forEach(ac => {
+      if (ac.relator && ac.relator !== 'Desconhecido') extracted.add(ac.relator.trim());
+      ac.adjuntos.forEach(adj => { 
+        if (adj && adj !== 'Nenhum' && adj.trim().length > 0) extracted.add(adj.trim()); 
+      });
+    });
+    setJudges(Array.from(extracted).sort((a, b) => a.localeCompare(b, 'pt-PT')));
   }, [db]);
 
   const handleMergeJudges = (main: string, others: string[]) => {
-    const updatedDb = db.map(ac => {
-      let changed = false;
-      let newRelator = ac.relator;
-      if (others.includes(ac.relator)) {
-        newRelator = main;
-        changed = true;
-      }
-      const newAdjuntos = ac.adjuntos.map(adj => others.includes(adj) ? main : adj);
-      const uniqueAdjuntos = Array.from(new Set(newAdjuntos)).filter(a => a !== newRelator);
-      if (JSON.stringify(uniqueAdjuntos) !== JSON.stringify(ac.adjuntos)) changed = true;
-      return changed ? { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos } : ac;
+    const mainClean = main.trim();
+    const othersLower = others.map(o => o.trim().toLowerCase());
+
+    setDb(currentDb => {
+      const newDb = currentDb.map(ac => {
+        let changed = false;
+        
+        // Relator
+        let newRelator = ac.relator.trim();
+        if (othersLower.includes(newRelator.toLowerCase())) {
+          newRelator = mainClean;
+          changed = true;
+        }
+        
+        // Adjuntos
+        const newAdjuntos = ac.adjuntos.map(adj => {
+          const adjTrimmed = adj.trim();
+          if (othersLower.includes(adjTrimmed.toLowerCase())) {
+            changed = true;
+            return mainClean;
+          }
+          return adjTrimmed;
+        });
+
+        if (changed) {
+            // Limpeza de duplicados e garantia de que relator não é adjunto
+            const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
+              .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
+            
+            return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
+        }
+        return ac;
+      });
+      return [...newDb]; // Forçar nova referência
     });
-    setDb(updatedDb);
-    updateJudgesList(updatedDb);
   };
 
   const handleSetRoot = (handle: FileSystemDirectoryHandle) => {
@@ -101,7 +368,19 @@ function App() {
     setActiveTab('process');
   };
 
-  const getPdfData = async (fileName: string): Promise<ArrayBuffer | null> => {
+  const handleAddAcordaos = (incoming: Acordao[]) => {
+    setDb(currentDb => {
+        const dbMap = new Map<string, Acordao>();
+        currentDb.forEach(a => dbMap.set(a.processo.toLowerCase().trim(), a));
+        incoming.forEach(newA => {
+            const procKey = newA.processo.toLowerCase().trim();
+            if (!dbMap.has(procKey)) dbMap.set(procKey, newA);
+        });
+        return Array.from(dbMap.values());
+    });
+  };
+
+  const openPdf = async (fileName: string) => {
     if (rootHandle) {
        const findFile = async (dir: FileSystemDirectoryHandle, name: string): Promise<FileSystemFileHandle | null> => {
           for await (const entry of (dir as any).values()) {
@@ -114,24 +393,19 @@ function App() {
           return null;
        };
        const handle = await findFile(rootHandle, fileName);
-       if (handle) return await (await handle.getFile()).arrayBuffer();
+       if (handle) {
+          const file = await handle.getFile();
+          window.open(URL.createObjectURL(file), '_blank');
+       } else {
+           alert("Ficheiro não encontrado na pasta selecionada.");
+       }
     } else {
-       const file = cachedFiles.find(f => f.name === fileName);
-       if (file) return await file.arrayBuffer();
-    }
-    return null;
-  };
-
-  const openPdf = async (fileName: string) => {
-    const buffer = await getPdfData(fileName);
-    if (buffer) {
-      const blob = new Blob([buffer], { type: 'application/pdf' });
-      window.open(URL.createObjectURL(blob), '_blank');
+        alert("Por favor, selecione a pasta de acórdãos no separador Processamento.");
     }
   };
 
   const handleSaveDb = () => {
-    const json = JSON.stringify({ db, savedSearches, chatSessions, descriptors, judges }, null, 2);
+    const json = JSON.stringify({ db, descriptors, judges }, null, 2);
     const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -146,93 +420,41 @@ function App() {
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
-        if (parsed.db) setDb(prev => [...prev, ...parsed.db.filter((x:any) => !prev.find(p=>p.id===x.id))]);
-        if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
-        if (parsed.chatSessions) setChatSessions(parsed.chatSessions);
-        if (parsed.descriptors) setDescriptors(parsed.descriptors);
+        if (parsed.db) handleAddAcordaos(parsed.db);
+        if (parsed.descriptors) {
+            const merged = { ...descriptors };
+            if (parsed.descriptors.social) merged.social = Array.from(new Set([...descriptors.social, ...parsed.descriptors.social])).sort();
+            if (parsed.descriptors.crime) merged.crime = Array.from(new Set([...descriptors.crime, ...parsed.descriptors.crime])).sort();
+            if (parsed.descriptors.civil) merged.civil = Array.from(new Set([...descriptors.civil, ...parsed.descriptors.civil])).sort();
+            setDescriptors(merged);
+        }
         setOnboardingStep('app');
       } catch (err) {
         alert("Erro ao ler ficheiro de backup.");
       }
     };
     reader.readAsText(file);
-    e.target.value = '';
+    e.target.value = ''; 
   };
 
-  if (onboardingStep !== 'app') {
-    return (
-      <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-        <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50">
-            <div className="mb-10 flex justify-center">
-              <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
-                <ScaleIcon className="w-12 h-12 text-blue-500"/>
-              </div>
-            </div>
-            <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">Área Jurídica</h2>
-            <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
-            <div className="grid grid-cols-1 gap-4">
-              {['social', 'crime', 'civil'].map((area: any) => (
-                <button 
-                  key={area} 
-                  onClick={() => selectLegalArea(area)} 
-                  className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
-                >
-                  <div className="p-4 bg-slate-700 rounded-2xl group-hover:bg-blue-900/20 transition-all">
-                    {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
-                  </div>
-                  <div>
-                      <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
-                  </div>
-                </button>
-              ))}
-              <div className="h-px bg-slate-700/50 my-2"></div>
-              <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
-                <Upload className="w-4 h-4"/> Carregar Backup (.json)
-              </button>
-            </div>
-        </div>
-        <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans selection:bg-legal-100">
+  const mainContent = onboardingStep === 'app' ? (
+    <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
         <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-legal-800 rounded-2xl border border-legal-700">
-                <ScaleIcon className="w-8 h-8 text-legal-100" />
-            </div>
+            <ScaleIcon className="w-8 h-8 text-legal-100" />
             <div>
-              <h1 className="text-2xl font-black tracking-tighter leading-none uppercase">JurisAnalítica</h1>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">{legalArea}</p>
-                <button onClick={() => setOnboardingStep('area')} className="text-[9px] bg-legal-700 hover:bg-legal-600 px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 transition-all">
-                   <RotateCcw className="w-2.5 h-2.5" /> Mudar
-                </button>
-              </div>
+              <h1 className="text-2xl font-black tracking-tighter uppercase">JurisAnalítica</h1>
+              <p className="text-[10px] text-legal-300 uppercase tracking-widest font-black">{legalArea || 'Local'}</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={handleSetupKey}
-              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${hasApiKey ? 'bg-green-600/20 border border-green-500/50 text-green-400' : 'bg-orange-600 text-white animate-pulse'}`}
-            >
-              {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <Key className="w-4 h-4"/>}
-              {hasApiKey ? 'IA Pronta' : 'Configurar Chave'}
+          <div className="flex gap-2">
+            <button onClick={() => fileInputRef.current?.click()} className="bg-legal-800 hover:bg-legal-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 border border-legal-700 transition-all">
+              <FolderOpen className="w-4 h-4" /> Importar
             </button>
-            <div className="h-10 w-px bg-legal-700 opacity-30 mx-1"></div>
-            <div className="flex bg-legal-800 rounded-2xl p-1 gap-1">
-              <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 hover:bg-legal-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-legal-100" title="Carregar Backup JSON">
-                <FolderOpen className="w-4 h-4" /> Importar
-              </button>
-              <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-100 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95" title="Exportar Backup JSON">
-                <Save className="w-4 h-4" /> Backup
-              </button>
-            </div>
+            <button onClick={handleSaveDb} className="bg-white text-legal-900 hover:bg-legal-50 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
+              <Save className="w-4 h-4" /> Backup
+            </button>
           </div>
         </div>
       </header>
@@ -246,10 +468,9 @@ function App() {
             ))}
         </div>
         <div className="flex-1 overflow-hidden bg-gray-50 relative">
-            {activeTab === 'process' && (
+            {activeTab === 'process' && legalArea && (
               <ProcessingModule 
-                apiKey={userApiKey}
-                onDataLoaded={d => setDb(p => [...p, ...d])} 
+                onDataLoaded={handleAddAcordaos} 
                 existingDB={db} 
                 onSetRootHandle={handleSetRoot} 
                 rootHandleName={rootHandleName} 
@@ -258,39 +479,78 @@ function App() {
                 onAddJudges={setJudges} 
                 onMergeJudges={handleMergeJudges}
                 availableJudges={judges} 
-                availableDescriptors={legalArea?descriptors[legalArea]:[]}
+                availableDescriptors={descriptors[legalArea]}
+                legalArea={legalArea}
+                onUpdateDb={setDb}
               />
             )}
             {activeTab === 'search' && (
               <SearchModule 
-                apiKey={userApiKey}
                 db={db} 
-                onSaveSearch={s => setSavedSearches(p => [...p, s])} 
-                savedSearches={savedSearches} 
-                onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} 
-                onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} 
                 onOpenPdf={openPdf} 
-                onGetPdfData={getPdfData} 
                 onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
                 availableDescriptors={legalArea?descriptors[legalArea]:[]} 
                 availableJudges={judges} 
-                onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}
               />
             )}
             {activeTab === 'chat' && (
               <ChatModule 
-                apiKey={userApiKey}
                 db={db} 
                 sessions={chatSessions} 
-                onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} 
-                onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} 
+                onSaveSession={s => setChatSessions(p => [s, ...p])} 
+                onDeleteSession={(id) => setChatSessions(p => p.filter(s => s.id !== id))} 
                 onOpenPdf={openPdf}
               />
             )}
         </div>
       </div>
-      <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
     </div>
+  ) : (
+    <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
+      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50">
+          <div className="mb-10 flex justify-center">
+            <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
+              <ScaleIcon className="w-12 h-12 text-blue-500"/>
+            </div>
+          </div>
+          <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">JurisAnalítica</h2>
+          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
+          <div className="grid grid-cols-1 gap-4">
+            {['social', 'crime', 'civil'].map((area: any) => (
+              <button 
+                key={area} 
+                onClick={() => selectLegalArea(area)} 
+                className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
+              >
+                <div className="p-4 bg-slate-700 rounded-2xl group-hover:bg-blue-900/20 transition-all">
+                  {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
+                </div>
+                <div>
+                    <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
+                </div>
+              </button>
+            ))}
+            <div className="h-px bg-slate-700/50 my-2"></div>
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
+              <Upload className="w-4 h-4"/> Carregar Backup (.json)
+            </button>
+          </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {mainContent}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        className="hidden" 
+        accept=".json" 
+        onChange={handleLoadDbFile}
+      />
+    </>
   );
 }
 

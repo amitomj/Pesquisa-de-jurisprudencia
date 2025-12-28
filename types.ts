@@ -1,5 +1,4 @@
 
-
 export interface Acordao {
   id: string;
   processo: string;
@@ -7,17 +6,18 @@ export interface Acordao {
   adjuntos: string[];
   data: string;
   sumario: string;
-  descritores: string[]; // List of legal tags/descriptors
-  textoAnalise: string; // The extracted legal analysis
-  textoCompleto: string; // Full extracted text for reference
+  descritores: string[];
+  textoAnalise: string;
+  textoCompleto: string;
   fileName: string;
+  tipoDecisao: 'Acórdão' | 'Decisão Sumária';
 }
 
 export interface SearchFilters {
   processo: string;
   relator: string;
   adjunto: string;
-  descritor: string; // New filter field
+  descritores: string[]; // Alterado para array
   dataInicio: string;
   dataFim: string;
   booleanAnd: string;
@@ -29,7 +29,7 @@ export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
-  sources?: Acordao[]; // References for the answer
+  sources?: Acordao[];
   timestamp: number;
 }
 
@@ -42,18 +42,15 @@ export interface ChatSession {
 
 export interface SearchResult {
   id: string;
-  name?: string; // User defined name for the search
+  name?: string;
   filters: SearchFilters;
   results: Acordao[];
   date: number;
 }
 
-// Global window extension for PDF.js and Native APIs
 declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
-    // Note: window.aistudio and the AIStudio type are provided by the ambient environment.
-    // Redeclaring them here causes conflict errors when the local name shadows the global one.
   }
 }
