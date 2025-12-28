@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle, Save, Download } from 'lucide-react';
+import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
@@ -18,7 +18,6 @@ interface Props {
   availableDescriptors?: string[]; 
   legalArea: 'social' | 'crime' | 'civil';
   onUpdateDb: (db: Acordao[]) => void;
-  onSaveDb: () => void;
 }
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -94,7 +93,7 @@ const JudgeAutocomplete: React.FC<{
 const ProcessingModule: React.FC<Props> = ({ 
     onDataLoaded, existingDB, onSetRootHandle, rootHandleName,
     onAddDescriptors, onMergeJudges, availableJudges = [], availableDescriptors = [],
-    legalArea, onUpdateDb, onSaveDb
+    legalArea, onUpdateDb
 }) => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -118,9 +117,10 @@ const ProcessingModule: React.FC<Props> = ({
     if (selectedMainJudge && selectedAliases.length > 0 && onMergeJudges) {
       if (confirm(`Atenção: Irá substituir permanentemente ${selectedAliases.length} nomes por "${selectedMainJudge}" em toda a biblioteca. Continuar?`)) {
         onMergeJudges(selectedMainJudge, selectedAliases);
+        // Reset visual imediato
         setSelectedMainJudge(null);
         setSelectedAliases([]);
-        alert("Fusão de magistrados concluída.");
+        alert("Fusão de magistrados concluída. Os nomes antigos foram removidos e substituídos.");
       }
     }
   };
@@ -164,6 +164,7 @@ const ProcessingModule: React.FC<Props> = ({
               descritores: ac.descritores.map(d => d === targetTag ? val : d)
           }));
           onUpdateDb(updatedDb);
+          alert(`Substituição de "${targetTag}" por "${val}" efetuada em toda a biblioteca.`);
       }
 
       setNewDescriptor('');
@@ -220,8 +221,6 @@ const ProcessingModule: React.FC<Props> = ({
             } else if (aiResult) {
                 if (aiResult.sumario) data.sumario = aiResult.sumario;
                 if (aiResult.descritores) data.descritores = aiResult.descritores;
-                if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
-                if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
             }
         }
         newData.push(data);
@@ -315,19 +314,14 @@ const ProcessingModule: React.FC<Props> = ({
                 <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Documentos</span>
                 <span className="text-2xl font-black">{existingDB.length}</span>
               </div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between">
                 <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Total Descritores</span>
                 <span className="text-2xl font-black text-blue-400">{availableDescriptors?.length || 0}</span>
               </div>
-              <button 
-                onClick={onSaveDb}
-                className="w-full bg-white/10 hover:bg-white/20 border border-white/20 py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                  <Save className="w-4 h-4 text-blue-400"/> Exportar Base de Dados
-              </button>
           </div>
       </div>
 
+      {/* PADRONIZAÇÃO DE MAGISTRADOS - GRID LADO A LADO */}
       <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
               <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
@@ -341,6 +335,7 @@ const ProcessingModule: React.FC<Props> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] items-start gap-8">
+              {/* Lado Esquerdo: Substituir */}
               <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-1 px-1">
                       <Trash2 className="w-3.5 h-3.5 text-orange-500" />
@@ -362,10 +357,12 @@ const ProcessingModule: React.FC<Props> = ({
                   </div>
               </div>
 
+              {/* Centro */}
               <div className="hidden md:flex items-center justify-center pt-12 text-gray-200">
                   <ArrowRight className="w-6 h-6" />
               </div>
 
+              {/* Lado Direito: Manter */}
               <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-1 px-1">
                       <Check className="w-3.5 h-3.5 text-green-600" />
@@ -429,7 +426,7 @@ const ProcessingModule: React.FC<Props> = ({
       </div>
 
       <div className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem] font-mono text-[11px] h-48 overflow-y-auto shadow-2xl border border-slate-800 custom-scrollbar">
-           {logs.map((log, i) => <div key={i} className="mb-1 opacity-80">{">"} {log}</div>)}
+           {logs.map((log, i) => <div key={i} className="mb-1 opacity-80">> {log}</div>)}
       </div>
     </div>
   );

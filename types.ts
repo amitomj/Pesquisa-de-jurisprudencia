@@ -1,5 +1,4 @@
 
-
 export interface Acordao {
   id: string;
   processo: string;
@@ -18,7 +17,7 @@ export interface SearchFilters {
   processo: string;
   relator: string;
   adjunto: string;
-  descritores: string[]; 
+  descritores: string[]; // Alterado para array
   dataInicio: string;
   dataFim: string;
   booleanAnd: string;
@@ -49,21 +48,9 @@ export interface SearchResult {
   date: number;
 }
 
-// Interface representing the AI Studio environment controls.
-// Defined outside declare global to allow standard export and resolve "Cannot export 'AIStudio'" error.
-export interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
 declare global {
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
-    /**
-     * aistudio property is injected by the environment.
-     * Added 'readonly' back to match the mandatory modifiers of the ambient environment declaration.
-     */
-    readonly aistudio: AIStudio;
   }
 }

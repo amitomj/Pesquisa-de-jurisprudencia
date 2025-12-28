@@ -3,6 +3,24 @@ import { Acordao } from '../types';
 
 const cleanText = (text: string) => text.replace(/\s+/g, ' ').trim();
 
+const removeHeader = (text: string): string => {
+  const headerPattern = /Porto\s*-\s*Tribunal da Relação\s*Secção Social\s*Campo Mártires da Pátria\s*4099-012 Porto\s*Telef:.*?Mail:.*?tribunais\.org\.pt/gis;
+  return text.replace(headerPattern, '');
+};
+
+const cleanSummaryContent = (text: string): string => {
+  const embeddedHeaderRegex = /Processo:\s*[\w\.\/]+\s*Referência:\s*\d+.*?Mail:\s*[\w\.\@]+\s*(Apelações em processo comum e especial\s*\(\d{4}\)|.*?tribunais\.org\.pt)/gis;
+  text = text.replace(embeddedHeaderRegex, ' ');
+  const footerCutoffRegex = /(\s+|['"]\s*|\s+[ivx\d]+\.?\s*)https?:\/\//i;
+  const match = text.match(footerCutoffRegex);
+  if (match && match.index) {
+      text = text.substring(0, match.index);
+  }
+  const endMarkers = [/Bibliografia\s*$/i, /Notas:\s*$/i, /Decisão\s*$/i];
+  endMarkers.forEach(marker => { text = text.replace(marker, ''); });
+  return text;
+};
+
 const cleanRunningText = (fullText: string): string => {
   let cleaned = fullText.replace(/Processo n\.º\s*.*?\n/gi, ''); 
   cleaned = cleaned.replace(/-\s*\n\s*/g, '');
@@ -11,120 +29,50 @@ const cleanRunningText = (fullText: string): string => {
   return cleaned.trim();
 };
 
-const extractTargetedSummary = (pages: string[]): string => {
-  const numPages = pages.length;
-  const targetPagesIdx = new Set<number>();
-  
-  // Primeiras 2 páginas
-  for (let i = 0; i < Math.min(2, numPages); i++) targetPagesIdx.add(i);
-  // Últimas 4 páginas
-  for (let i = Math.max(0, numPages - 4); i < numPages; i++) targetPagesIdx.add(i);
-
-  const combinedText = Array.from(targetPagesIdx)
-    .sort((a, b) => a - b)
-    .map(idx => pages[idx])
-    .join('\n');
-
-  const sumarioMarkers = [
-    /sumário:?/i,
-    /Sumário/i,
-    /segue\s+sumário\s+da\s+responsabilidade\s+da\s+relatora/i,
-    /Sumário\s+\(art\.\s*663º,\s*nº\s*7,\s*do\s*CPC\):?/i,
-    /Sumário\s+\(\s*elaborado\s+pela\s+relatora\s+nos\s+termos\s+do\s+nº7\s+do\s+art\.\s*663º\s+do\s+C\.P\.Civil\)/i,
-    /Sumário\s+da\s+responsabilidade\s+do\s+relator/i
-  ];
-
-  for (const marker of sumarioMarkers) {
-    const match = combinedText.match(marker);
-    if (match && match.index !== undefined) {
-      const start = match.index + match[0].length;
-      const sub = combinedText.substring(start);
-      // Pára ao encontrar o início de uma nova secção importante
-      const endMatch = sub.match(/\n\s*(DECISÃO|ACORDAM|RELATÓRIO|FUNDAMENTAÇÃO|I\.|1\.|CONCLUSÃO)/i);
-      const end = endMatch ? endMatch.index : 4000;
-      const candidate = sub.substring(0, end).trim();
-      if (candidate.length > 50) return cleanRunningText(candidate);
-    }
-  }
-
-  return "";
-};
-
-const extractLegalReasoning = (fullText: string): string => {
-  const startMarkers = [
-    /FUNDAMENTAÇÃO\s+DE\s+DIREITO/i,
-    /O\s+DIREITO/i,
-    /DO\s+DIREITO/i,
-    /APRECIAÇÃO\s+JURÍDICA/i,
-    /MÉRITO\s+DO\s+RECURSO/i,
-    /APRECIAÇÃO\s+DO\s+RECURSO/i
-  ];
-
-  const endMarkers = [
-    /\n\s*DECISÃO\s*\n/i,
-    /\n\s*DISPOSITIVO\s*\n/i,
-    /\n\s*ACORDAM\s*\n/i,
-    /\n\s*CUSTAS\s*\n/i,
-    /Em\s+face\s+do\s+exposto/i
-  ];
-
-  let startIndex = -1;
-  for (const marker of startMarkers) {
-    const match = fullText.match(marker);
-    if (match && match.index !== undefined) {
-      startIndex = match.index;
-      break;
-    }
-  }
-
-  if (startIndex === -1) startIndex = Math.floor(fullText.length * 0.4);
-
-  let endIndex = fullText.length;
-  for (const marker of endMarkers) {
-    const match = fullText.substring(startIndex).match(marker);
-    if (match && match.index !== undefined) {
-      endIndex = startIndex + match.index;
-      break;
-    }
-  }
-
-  return fullText.substring(startIndex, endIndex).trim();
-};
-
 export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const arrayBuffer = await file.arrayBuffer();
   // @ts-ignore
   const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   
-  const pagesText: string[] = [];
   let fullRawText = '';
+  let summarySearchText = '';
   const numPages = pdf.numPages;
 
+  // Extração seletiva: Primeiras 3 e últimas 3 páginas
   for (let i = 1; i <= numPages; i++) {
-    const page = await pdf.getPage(i);
-    const textContent = await page.getTextContent();
-    // @ts-ignore
-    const strings = textContent.items.map((item: any) => item.str);
-    const pageStr = strings.join(' ');
-    pagesText.push(pageStr);
-    fullRawText += pageStr + '\n';
+    const isFirstPages = i <= 3;
+    const isLastPages = i > numPages - 3;
+
+    if (isFirstPages || isLastPages) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      // @ts-ignore
+      const strings = textContent.items.map((item: any) => item.str);
+      const pageText = strings.join(' \n '); 
+      summarySearchText += pageText + '\n\n';
+      fullRawText += pageText + '\n\n';
+    } else {
+        // Apenas para manter o rasto do texto completo se necessário, 
+        // mas aqui focamos na regra de negócio das extremidades
+    }
   }
 
-  const headerText = fullRawText.substring(0, 8000);
-  const footerText = fullRawText.substring(fullRawText.length - 8000);
-  const metaSearchText = headerText + '\n' + footerText;
-
+  summarySearchText = removeHeader(summarySearchText);
+  
   let relator = 'Desconhecido';
   let data = 'N/D';
   let adjuntos: string[] = [];
   let tipoDecisao: 'Acórdão' | 'Decisão Sumária' = 'Acórdão';
 
-  if (/Decisão\s+Sumária/i.test(headerText)) {
+  // Deteção rigorosa de Decisão Sumária (sempre nas primeiras páginas)
+  const summaryDecisionKeywords = [/Decisão\s+Sumária/i, /Decisao\s+Sumaria/i];
+  if (summaryDecisionKeywords.some(regex => regex.test(summarySearchText.substring(0, 3000)))) {
     tipoDecisao = 'Decisão Sumária';
   }
 
+  // --- ESTRATÉGIA: Topo e Assinaturas (presentes no summarySearchText) ---
   const signatureRegex = /Assinado em\s+(\d{2}-\d{2}-\d{4}),\s*por\s*[\n\s]*([^\n,]+)/gi;
-  const matches = [...metaSearchText.matchAll(signatureRegex)];
+  const matches = [...summarySearchText.matchAll(signatureRegex)];
 
   if (matches.length > 0) {
     data = matches[0][1];
@@ -137,19 +85,23 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     }
   }
 
-  const processMatch = headerText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
+  const processMatch = summarySearchText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
   const processo = processMatch ? processMatch[1] : 'N/D';
 
-  let sumario = extractTargetedSummary(pagesText);
-
-  if (!sumario) {
-      const sumarioMatch = fullRawText.match(/Sumário:?\s*([\s\S]*?)(?=(Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Notas:|Bibliografia|$))/i);
-      if (sumarioMatch && sumarioMatch[1]) {
-          sumario = cleanRunningText(sumarioMatch[1]).substring(0, 5000);
-      }
+  let sumario = '';
+  // Pesquisa de Sumário apenas no summarySearchText (1-3 e últimas 3)
+  const sumarioMatch = summarySearchText.match(/Sumário:?\s*([\s\S]*?)(?=(Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Notas:|Bibliografia|$))/i);
+  
+  if (sumarioMatch && sumarioMatch[1]) {
+      sumario = sumarioMatch[1];
+      if (sumario.length > 5000) sumario = sumario.substring(0, 5000);
+      sumario = cleanSummaryContent(sumario);
   }
-
-  const fundamentacao = extractLegalReasoning(fullRawText);
+  
+  sumario = cleanRunningText(sumario).trim();
+  if (sumario.length < 10) {
+      sumario = "Sumário não identificado nas extremidades do documento (Regra 3+3).";
+  }
 
   return {
     id: crypto.randomUUID(),
@@ -158,9 +110,9 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     relator: cleanText(relator),
     adjuntos: adjuntos,
     data: cleanText(data),
-    sumario: sumario || "Sumário não identificado automaticamente.",
+    sumario: sumario,
     descritores: [],
-    textoAnalise: cleanRunningText(fundamentacao),
+    textoAnalise: cleanRunningText(summarySearchText),
     textoCompleto: fullRawText,
     tipoDecisao
   };

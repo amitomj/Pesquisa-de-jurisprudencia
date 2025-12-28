@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
-import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock } from 'lucide-react';
+import { Acordao, SearchResult, ChatSession } from './types';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -32,7 +32,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Aplicação de contrato colectivo de trabalho", "Aplicação de lei estrangeira", "Aplicação do direito",
   "Aplicação subsidiária do Código de Processo Civil", "Apoio judiciário", "Apólice uniforme", "Arbitragem",
   "Arguição de nulidades", "Articulado motivador", "Articulado superveniente", "Ascendente", "Assédio", "Assédio horizontal",
-  "Assistente", "Assembleia de credores", "Assessor técnico", "Assistência a menores", "Assistência a pessoas com distivéis",
+  "Assistente", "Assembleia de credores", "Assessor técnico", "Assistência a menores", "Assistência a pessoas com deficiência",
   "Assistência de terceira pessoa", "Assistência hospitalar", "Associações de empregadores", "Associações sindicais",
   "Assunção de dívida", "Atenuação especial da coima", "Audição do arguido", "Audiência de partes", "Audiência prévia",
   "Autarquia local", "Auto de advertência", "Auto de não conciliação", "Auto de notícia", "Autonomia administrativa",
@@ -78,11 +78,11 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Custos aleatórios", "Dados pessoais", "Dano", "Danos patrimoniais", "Danos não patrimoniais", "Decisão administrativa",
   "Decisão condenatória", "Decisão disciplinar", "Decisão do Presidente do STJ", "Decisão final", "Decisão implícita",
   "Decisão intercalar", "Decisão prematura", "Decisão surpresa", "Declaração de não renovação", "Declaração de renovação",
-  "Declaração inexacta", "Declaração receptícia", "Declaração tácita", "Declaração unilateral",
+  "Declaração inexacta", "Declaração negocial", "Declaração receptícia", "Declaração tácita", "Declaração unilateral",
   "Declarações de parte", "Dedução de rendimentos auferidos após o despedimento", "Deficiência da gravação",
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
-  "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Desccaracterização de acidente de trabalho",
+  "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
   "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
   "Desprezo pelas regras de segurança", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
@@ -119,7 +119,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Extinção de posto de trabalho", "Extinção de sociedade", "Extinção do contrato de trabalho", "Extinção do poder jurisdicional",
   "Facility Services", "Facto constitutivo", "Facto duradouro", "Factor de bonificação 1,5", "Factos admitidos por acordo",
   "Factos complementares", "Factos conclusivos", "Factos concretizadores", "Factos continuados", "Factos essenciais",
-  "Factos instrumentais", "Factos não alegados", "Factos não constantes da nota de culpa", "Factos notórios", "Factos pessoal",
+  "Factos instrumentais", "Factos não alegados", "Factos não constantes da nota de culpa", "Factos notórios", "Factos pessoais",
   "Factos supervenientes", "Facturas", "Falência", "Falsas declarações", "Falta da entidade responsável",
   "Falta de apresentação do procedimento disciplinar", "Falta de aviso prévio", "Falta de citação", "Falta de contestação",
   "Falta de fundamentação", "Falta de pagamento da retribuição", "Falta do réu", "Falta grave e indesculpável",
@@ -138,8 +138,11 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Ilicitude", "Ilisão", "Impedimento", "Impenhorabilidade", "Imperatividade da lei", "Impossibilidade absoluta",
   "Impossibilidade definitiva", "Impossibilidade do cumprimento", "Impossibilidade objectiva", "Impossibilidade superveniente",
   "Impossibilidade temporária", "Impugnação da matéria de facto", "Impugnação diferida de decisões intercalares",
-  "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incompetência absoluta", "Incompetência relativa",
-  "Inconstitucionalidade", "Incumprimento do contrato",
+  "Imunidade jurisdicional", "Inadaptação do trabalhador", "Incapacidade funcional", "Incapacidade grave",
+  "Incapacidade para o exercício de outra profissão", "Incapacidade permanente absoluta",
+  "Incapacidade permanente absoluta para o trabalho habitual", "Incapacidade permanente parcial", "Incapacidade temporária",
+  "Incapacidade temporária absoluta", "Incapacidade temporária superior a dezoito meses", "Incidentes da instância",
+  "Incompetência absoluta", "Incompetência relativa", "Inconstitucionalidade", "Incumprimento do contrato",
   "Incumprimento parcial", "Incumprimento por facto de terceiro", "Indeferimento liminar", "Indeferimento tácito",
   "Indemnização", "Indemnização de antiguidade", "Indemnização por falta de aviso prévio",
   "Indemnização por incumprimento de obrigações laborais", "Indeterminabilidade", "Indeterminação do objecto",
@@ -147,7 +150,43 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Informação genética", "Infracção continuada", "Infracção disciplinar", "Infracção estradal", "Início de laboração",
   "Inimputabilidade", "Injúrias", "Inquérito", "Inquérito prévio", "Inquirição de testemunhas", "Insolvência", "Interpelação",
   "Intervalo de descanso", "Instituição Particular de Solidariedade Social", "Instituições de crédito",
-  "Instituto de Segurança Social", "Instituto do Emprego e Formação Profimplamentaional", "Parecer do Ministério Público", "Parecer do Sindicato",
+  "Instituto de Segurança Social", "Instituto do Emprego e Formação Profissional", "Instituto Público", "Instrução técnica",
+  "Instrutor", "Interesse em agir", "Interesse imaterial", "Interesse público", "Interesses de particular relevância social",
+  "Internet", "Interposição de recurso", "Interpretação", "Interpretação analógica", "Interpretação conforme à Constituição",
+  "Interpretação da declaração negocial", "Interpretação da lei", "Interpretação de convenção colectiva de trabalho",
+  "Interpretação de sentença", "Interpretação do negócio jurídico", "Interrupção da instância", "Interrupção da prescrição",
+  "Intervenção acessória", "Intervenção de terceiros", "Intervenção principal", "Inutilidade superveniente da lide",
+  "Invalidade", "Invalidade do procedimento disciplinar", "Invalidade parcial", "Inversão do contencioso", "Inversão do ónus da prova",
+  "IRCT", "Irredutibilidade da retribuição", "Irregularidade", "Irregularidade processual", "Irrevogabilidade", "IRS", "Isenção",
+  "Isenção de horário de trabalho", "Jogador de futebol", "Jornalista", "Juízo pericial", "Juízos Cíveis", "Juízos do Trabalho",
+  "Julgamento", "Julgamento ampliado", "Junção de documento", "Junção do procedimento disciplinar", "Junta médica",
+  "Juros de mora", "Jus variandi", "Justa causa de despedimento", "Justa causa de resolução", "Justo impedimento", "Lacuna",
+  "Lançamento de nova actividade", "Lapso manifesto", "Lar de terceira idade", "Lay-off", "Legitimidade", "Legitimidade activa",
+  "Legitimidade passiva", "Lei aplicável", "Lei do Orçamento de Estado", "Lei especial", "Lei interpretativa",
+  "Lesão de interesses patrimoniais sérios", "Liberdade contratual", "Liberdade de escolha de profissão",
+  "Liberdade de expressão e de opinião", "Licença ilimitada", "Licença parental", "Licença sem vencimento de longa duração",
+  "Limite de idade", "Limite máximo da pena", "Limites à duração do trabalho", "Limites da condenação", "Liquidação",
+  "Liquidação de sentença", "Liquidatário", "Litigância de má fé", "Litisconsórcio", "Litisconsórcio necessário",
+  "Litisconsórcio voluntário", "Livrete individual de controlo", "Local de pagamento", "Local de refeição", "Local de trabalho",
+  "Má fé", "Mandato", "Mandato forense", "Massa insolvente", "Matéria de direito", "Matéria de facto", "Mediação",
+  "Medida da coima", "Meios de prova", "Meios de vigilância a distância", "Melhoria da aplicação do direito", "Menor",
+  "Microempresa", "Ministro do culto", "Mobbing", "Mobilidade funcional", "Mora", "Morte do empregador", "Morte do trabalhador",
+  "Motivação", "Motivo de força maior", "Motorista", "Mudança do estabelecimento", "Multa", "Músico", "Não admissão do recurso",
+  "Natureza jurídica", "Necessidade atendível", "Negligência consciente", "Negligência grosseira", "Negligência médica",
+  "Negócio formal", "Nexo de causalidade", "Nomeação de patrono", "Norma imperativa", "Nota de culpa", "Notificação",
+  "Notificação entre advogados", "Notificação para pagamento de multa", "Novação", "Novo julgamento", "Nulidade",
+  "Nulidade da estipulação do termo", "Nulidade de acórdão", "Nulidade de cláusula", "Nulidade de despacho",
+  "Nulidade de sentença", "Nulidade do contrato", "Nulidade insanável", "Nulidade por falta de forma", "Nulidade processual",
+  "Objecto do contrato de seguro", "Objecto do litígio", "Objecto do negócio", "Objecto do recurso",
+  "Obras na residência do sinistrado", "Obrigação de indemnização", "Obrigação fiscal", "Obrigação ilíquida",
+  "Obrigação natural", "Obrigação voluntária", "Obrigatoriedade de pagamento", "Obscuridade", "Ofensas à honra do trabalhador",
+  "Oficial de justiça", "Omissão de gravação da prova", "Omissão de pronúncia", "Ónus da prova", "Ónus de alegação",
+  "Ónus de concluir", "Oposição", "Oposição à execução", "Oposição à liquidação", "Oposição à reintegração",
+  "Oposição de acórdãos", "Oposição entre os fundamentos e a decisão", "Ordem de julgamento", "Ordem de serviço",
+  "Ordem escrita", "Ordem legítima", "Ordem pública internacional", "Órgãos de administração", "Órgãos de fiscalização",
+  "Outsourcing", "Pacto de desaforamento", "Pacto de não concorrência", "Pacto de permanência", "Pacto privativo de jurisdição",
+  "Pagamento", "Pagamento de retribuições intercalares pelo Estado", "Pagamento em prestações", "Parecer da CITE",
+  "Parecer do Instituto do Emprego e Formação Profissional", "Parecer do Ministério Público", "Parecer do Sindicato",
   "Parecer técnico", "Parentalidade", "Património autónomo", "Participação de acidente de trabalho", "Patrocínio oficioso",
   "Pedido", "Pedido de juros", "Pedido genérico", "Pedido principal", "Pedido subsidiário", "Pedidos alternativos", "Penhora",
   "Pensão", "Pensão complementar de reforma", "Pensão de reduzido montante", "Pensão de reforma", "Pensão de sobrevivência",
@@ -155,7 +194,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Período de repouso", "Período de funcionamento", "Período experimental", "Período normal de trabalho", "PER",
   "Personalidade judiciária", "Pessoa colectiva", "Petição deficiente", "Petição inicial", "Plataforma digital",
   "Pluralidade de empregadores", "Pluralidade de entidades responsáveis", "Pluralidade subjectiva subsidiária", "Pluriemprego",
-  "Poder de direção", "Poder disciplinar", "Poder discricionário", "Poderes da Relação", "Poderes de representação",
+  "Poder de direcção", "Poder disciplinar", "Poder discricionário", "Poderes da Relação", "Poderes de representação",
   "Poderes do juiz", "Poderes do Supremo Tribunal de Justiça", "Poderes do tribunal", "Polivalência funcional",
   "Portaria de extensão", "Portaria de Regulamentação do Trabalho para os trabalhadores administrativos", "Posto de trabalho",
   "Prática disciplinar", "Praticante desportivo", "Prazo", "Prazo de caducidade", "Prazo de interposição do recurso",
@@ -177,7 +216,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Procedimento cautelar", "Processo comum", "Processo de contra-ordenação", "Processo de insolvência", "Processo de trabalho",
   "Processo equitativo", "Processo especial de recuperação de empresa", "Processo executivo", "Processo penal",
   "Processo urgente", "Procuração", "Professor", "Professor universitário", "Progressão na carreira", "Progressão salarial",
-  "Progressão na categoria", "Proibição de discrimininação", "Proibição de prova", "Proibição do lock-out",
+  "Progressão na categoria", "Proibição de discriminação", "Proibição de prova", "Proibição do lock-out",
   "Promessa de contrato de trabalho", "Proporcionais de férias e de subsídios de férias e de Natal", "Propositura da acção",
   "Prorrogação do prazo", "Protecção contra quedas", "Protecção da maternidade e paternidade", "Protecção de dados pessoais",
   "Protocolo", "Prova", "Prova documental", "Prova gravada", "Prova pericial", "Prova plena", "Prova por confissão",
@@ -251,6 +290,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
 
 function App() {
   const [db, setDb] = useState<Acordao[]>([]);
+  const [savedSearches, setSavedSearches] = useState<SearchResult[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [descriptors, setDescriptors] = useState<{social: string[], crime: string[], civil: string[]}>({
     social: Array.from(new Set(SOCIAL_DESCRIPTORS_LIST)).sort(),
@@ -262,64 +302,17 @@ function App() {
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  
-  // Detecção de estado da IA
-  const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
-  const [aiMode, setAiMode] = useState<'system' | 'personal' | 'none'>('none');
+  const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
   };
 
-  useEffect(() => {
-    const checkAiKey = async () => {
-      // 1. Prioridade: Chave de Sistema (Vercel Env Var)
-      if (process.env.API_KEY) {
-        setIsAiConfigured(true);
-        setAiMode('system');
-        return;
-      }
-
-      // 2. Alternativa: Chave Pessoal (Google AI Studio Context)
-      if (window.aistudio) {
-        try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          if (hasKey) {
-            setIsAiConfigured(true);
-            setAiMode('personal');
-          }
-        } catch (e) {
-          console.debug("Verificação de chave AI Studio ignorada");
-        }
-      }
-    };
-    checkAiKey();
-  }, []);
-
-  const handleOpenAiKeyDialog = async () => {
-    if (aiMode === 'system') {
-        alert("A IA está configurada via Variável de Ambiente (Vercel). Esta é a configuração mais segura para deployments privados.");
-        return;
-    }
-
-    if (window.aistudio) {
-      try {
-        await window.aistudio.openSelectKey();
-        setIsAiConfigured(true);
-        setAiMode('personal');
-      } catch (e) {
-        console.error("Falha ao abrir seletor de chaves");
-      }
-    } else {
-        alert("Configuração Vercel:\n\nPara usar a sua chave privada e ser o único a utilizá-la:\n1. Vá ao Vercel -> Settings -> Environment Variables\n2. Adicione 'API_KEY' com o valor da sua chave.\n3. Faça Redeploy.\n\nPara garantir que só você acede ao site, ative o 'Deployment Protection' nas definições do Vercel.");
-    }
-  };
-
+  // Extração dinâmica de juízes baseada no DB atual
   useEffect(() => {
     const extracted = new Set<string>();
     db.forEach(ac => {
@@ -336,13 +329,17 @@ function App() {
     const othersLower = others.map(o => o.trim().toLowerCase());
 
     setDb(currentDb => {
-      return currentDb.map(ac => {
+      const newDb = currentDb.map(ac => {
         let changed = false;
+        
+        // Relator
         let newRelator = ac.relator.trim();
         if (othersLower.includes(newRelator.toLowerCase())) {
           newRelator = mainClean;
           changed = true;
         }
+        
+        // Adjuntos
         const newAdjuntos = ac.adjuntos.map(adj => {
           const adjTrimmed = adj.trim();
           if (othersLower.includes(adjTrimmed.toLowerCase())) {
@@ -353,12 +350,15 @@ function App() {
         });
 
         if (changed) {
+            // Limpeza de duplicados e garantia de que relator não é adjunto
             const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
               .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
+            
             return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
         }
         return ac;
       });
+      return [...newDb]; // Forçar nova referência
     });
   };
 
@@ -409,16 +409,7 @@ function App() {
     const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `juris_backup_legal_${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-  };
-
-  const handleSaveChats = () => {
-    const json = JSON.stringify({ chatSessions }, null, 2);
-    const blob = new Blob([json], { type: "application/json" });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `juris_chats_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `juris_backup_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
   };
 
@@ -439,34 +430,11 @@ function App() {
         }
         setOnboardingStep('app');
       } catch (err) {
-        alert("Erro ao ler ficheiro de backup jurídico.");
+        alert("Erro ao ler ficheiro de backup.");
       }
     };
     reader.readAsText(file);
     e.target.value = ''; 
-  };
-
-  const handleLoadChatFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target?.result as string);
-        if (parsed.chatSessions) {
-            setChatSessions(current => {
-                const existingIds = new Set(current.map(s => s.id));
-                const filteredNew = parsed.chatSessions.filter((s: ChatSession) => !existingIds.has(s.id));
-                return [...filteredNew, ...current];
-            });
-            alert("Base de dados de chat carregada e fundida com sucesso.");
-        }
-      } catch (err) {
-        alert("Erro ao ler ficheiro de chat.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
   };
 
   const mainContent = onboardingStep === 'app' ? (
@@ -476,60 +444,26 @@ function App() {
           <div className="flex items-center gap-4">
             <ScaleIcon className="w-8 h-8 text-legal-100" />
             <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">JurisAnalítica</h1>
-              <p className="text-[9px] text-legal-400 uppercase tracking-widest font-black mt-1">Área {legalArea}</p>
+              <h1 className="text-2xl font-black tracking-tighter uppercase">JurisAnalítica</h1>
+              <p className="text-[10px] text-legal-300 uppercase tracking-widest font-black">{legalArea || 'Local'}</p>
             </div>
           </div>
-          <div className="flex gap-2 items-center">
-            
-            <button 
-                onClick={handleOpenAiKeyDialog}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400 shadow-[0_0_15px_rgba(34,197,94,0.15)]' : 'bg-orange-500/10 border-orange-500/20 text-orange-400 animate-pulse'}`}
-                title={aiMode === 'system' ? "Configurado via Vercel (Seguro)" : "Clique para configurar chave pessoal"}
-            >
-                {aiMode === 'system' ? <Lock className="w-4 h-4" /> : isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {aiMode === 'system' ? 'IA Sistema Pronta' : isAiConfigured ? 'IA Pessoal Ativa' : 'Ligar IA Pessoal'}
+          <div className="flex gap-2">
+            <button onClick={() => fileInputRef.current?.click()} className="bg-legal-800 hover:bg-legal-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 border border-legal-700 transition-all">
+              <FolderOpen className="w-4 h-4" /> Importar
             </button>
-
-            <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
-            
-            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
-                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Histórico de Chat">
-                    <History className="w-4 h-4" />
-                </button>
-                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados de Chat">
-                    <Download className="w-4 h-4" /> Chats
-                </button>
-            </div>
-
-            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Acórdãos/Backup Geral">
-                    <Upload className="w-4 h-4" />
-                </button>
-                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Base de Dados Jurídica">
-                    <Save className="w-4 h-4" /> Acórdãos
-                </button>
-            </div>
+            <button onClick={handleSaveDb} className="bg-white text-legal-900 hover:bg-legal-50 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
+              <Save className="w-4 h-4" /> Backup
+            </button>
           </div>
         </div>
       </header>
-
-      {!isAiConfigured && (
-          <div className="bg-orange-50 border-b border-orange-100 p-2 flex items-center justify-center gap-3 animate-in slide-in-from-top-4">
-              <AlertCircle className="w-4 h-4 text-orange-600" />
-              <p className="text-[10px] font-black text-orange-800 uppercase tracking-widest">
-                  A IA não está configurada. A análise automática requer uma chave API ativa.
-                  <span className="mx-2 opacity-30">|</span>
-                  <button onClick={handleOpenAiKeyDialog} className="underline font-black hover:text-orange-900">Configurar Chave</button>
-              </p>
-          </div>
-      )}
 
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
             {['process', 'search', 'chat'].map((tab: any) => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria IA'}
+                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
               </button>
             ))}
         </div>
@@ -540,7 +474,7 @@ function App() {
                 existingDB={db} 
                 onSetRootHandle={handleSetRoot} 
                 rootHandleName={rootHandleName} 
-                onCacheFiles={() => {}} 
+                onCacheFiles={setCachedFiles} 
                 onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
                 onAddJudges={setJudges} 
                 onMergeJudges={handleMergeJudges}
@@ -548,7 +482,6 @@ function App() {
                 availableDescriptors={descriptors[legalArea]}
                 legalArea={legalArea}
                 onUpdateDb={setDb}
-                onSaveDb={handleSaveDb}
               />
             )}
             {activeTab === 'search' && (
@@ -558,22 +491,13 @@ function App() {
                 onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
                 availableDescriptors={legalArea?descriptors[legalArea]:[]} 
                 availableJudges={judges} 
-                onSaveDb={handleSaveDb}
               />
             )}
             {activeTab === 'chat' && (
               <ChatModule 
                 db={db} 
                 sessions={chatSessions} 
-                onSaveSession={s => setChatSessions(p => {
-                    const idx = p.findIndex(x => x.id === s.id);
-                    if (idx > -1) {
-                        const next = [...p];
-                        next[idx] = s;
-                        return next;
-                    }
-                    return [s, ...p];
-                })} 
+                onSaveSession={s => setChatSessions(p => [s, ...p])} 
                 onDeleteSession={(id) => setChatSessions(p => p.filter(s => s.id !== id))} 
                 onOpenPdf={openPdf}
               />
@@ -583,16 +507,14 @@ function App() {
     </div>
   ) : (
     <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-legal-400 to-blue-500"></div>
-          
+      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50">
           <div className="mb-10 flex justify-center">
             <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
               <ScaleIcon className="w-12 h-12 text-blue-500"/>
             </div>
           </div>
           <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">JurisAnalítica</h2>
-          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição ou importe uma base existente.</p>
+          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
           <div className="grid grid-cols-1 gap-4">
             {['social', 'crime', 'civil'].map((area: any) => (
               <button 
@@ -605,30 +527,14 @@ function App() {
                 </div>
                 <div>
                     <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sessão Limpa</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
                 </div>
               </button>
             ))}
-            <div className="h-px bg-slate-700/50 my-6"></div>
-            <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <Database className="w-5 h-5 group-hover:scale-110 transition-transform text-blue-500"/> Acórdãos
-                </button>
-                <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform text-green-500"/> Histórico Chat
-                </button>
-            </div>
-            
-            <div className="mt-6 p-4 bg-slate-900/50 rounded-2xl border border-slate-700/50 text-left">
-                <div className="flex items-center gap-2 mb-2">
-                    <Info className="w-3 h-3 text-blue-400"/>
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Segurança de Dados</span>
-                </div>
-                <p className="text-[9px] text-slate-500 leading-relaxed font-bold uppercase">
-                    Esta aplicação é centrada na privacidade. Os seus documentos PDF nunca saem do seu computador. Apenas o texto estritamente necessário é enviado para a IA (Google) para processamento.
-                    {aiMode === 'system' && <span className="block mt-1 text-green-500/80"><ShieldCheck className="inline w-2.5 h-2.5 mr-1"/> Modo Seguro (Chave de Sistema) Ativo.</span>}
-                </p>
-            </div>
+            <div className="h-px bg-slate-700/50 my-2"></div>
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
+              <Upload className="w-4 h-4"/> Carregar Backup (.json)
+            </button>
           </div>
       </div>
     </div>
@@ -643,13 +549,6 @@ function App() {
         className="hidden" 
         accept=".json" 
         onChange={handleLoadDbFile}
-      />
-      <input 
-        type="file" 
-        ref={chatInputRef} 
-        className="hidden" 
-        accept=".json" 
-        onChange={handleLoadChatFile}
       />
     </>
   );
