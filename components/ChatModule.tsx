@@ -7,6 +7,7 @@ import { Send, Bot, Trash2, Download, Eye, FileText, X, Library, Scale, Info, Ke
 import ReactMarkdown from 'react-markdown';
 
 interface Props {
+  apiKey: string;
   db: Acordao[];
   sessions: ChatSession[];
   onSaveSession: (session: ChatSession) => void;
@@ -14,7 +15,7 @@ interface Props {
   onOpenPdf: (fileName: string) => void;
 }
 
-const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf }) => {
+const ChatModule: React.FC<Props> = ({ apiKey, db, sessions, onSaveSession, onDeleteSession, onOpenPdf }) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,6 +32,10 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (!apiKey) {
+        alert('Por favor, configure a sua Gemini API Key na barra superior.');
+        return;
+    }
     if (!currentSession) startNewChat();
 
     const session = currentSession || {
@@ -59,7 +64,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         return keywords.some(k => text.includes(k));
       }).slice(0, 40); 
 
-      const answer = await generateLegalAnswer(input, relevantContext);
+      const answer = await generateLegalAnswer(apiKey, input, relevantContext);
       
       const botMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -107,6 +112,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
              <div className="h-full flex flex-col items-center justify-center text-gray-400 animate-in fade-in zoom-in duration-700">
                 <div className="p-8 bg-white rounded-3xl shadow-xl mb-6 border border-gray-100"><Scale className="w-16 h-16 text-legal-100"/></div>
                 <h3 className="text-xl font-bold text-gray-800">Consultoria Jurídica IA</h3>
+                {!apiKey && <p className="mt-2 text-orange-600 font-bold animate-pulse text-xs">Configure a sua Chave de API para começar.</p>}
              </div>
           ) : (
              currentSession.messages.map(msg => {
@@ -159,8 +165,8 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
 
         <div className="p-6 bg-white border-t flex gap-4 shadow-lg z-20">
           <div className="flex-1 relative">
-            <input type="text" className="w-full border border-gray-200 bg-gray-50 rounded-2xl p-4 pr-14 focus:outline-none focus:ring-4 focus:ring-legal-100 transition-all shadow-inner text-sm font-medium" placeholder="Questão jurídica..." value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={loading} />
-            <button onClick={handleSend} disabled={loading || !input.trim()} className="absolute right-2 top-1/2 -translate-y-1/2 bg-legal-600 text-white p-2.5 rounded-xl shadow-lg active:scale-90 transition-all"><Send className="w-5 h-5" /></button>
+            <input type="text" className="w-full border border-gray-200 bg-gray-50 rounded-2xl p-4 pr-14 focus:outline-none focus:ring-4 focus:ring-legal-100 transition-all shadow-inner text-sm font-medium" placeholder={apiKey ? "Questão jurídica..." : "Configure a chave de API primeiro..."} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={loading || !apiKey} />
+            <button onClick={handleSend} disabled={loading || !input.trim() || !apiKey} className="absolute right-2 top-1/2 -translate-y-1/2 bg-legal-600 text-white p-2.5 rounded-xl shadow-lg active:scale-90 transition-all disabled:opacity-30"><Send className="w-5 h-5" /></button>
           </div>
         </div>
       </div>

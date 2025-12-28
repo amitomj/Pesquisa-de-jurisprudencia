@@ -3,9 +3,11 @@ import React, { useState, useRef } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, CheckCircle, RefreshCw, FilePlus, Bot, XCircle, ArrowRight, Users, Info, Loader2 } from 'lucide-react';
+// Added AlertTriangle to imports
+import { FolderUp, CheckCircle, RefreshCw, FilePlus, Bot, XCircle, ArrowRight, Users, Info, Loader2, AlertTriangle } from 'lucide-react';
 
 interface Props {
+  apiKey: string;
   onDataLoaded: (data: Acordao[]) => void;
   existingDB: Acordao[];
   onSetRootHandle: (handle: FileSystemDirectoryHandle) => void;
@@ -19,7 +21,7 @@ interface Props {
 }
 
 const ProcessingModule: React.FC<Props> = ({ 
-    onDataLoaded, existingDB, onSetRootHandle, rootHandleName, onCacheFiles,
+    apiKey, onDataLoaded, existingDB, onSetRootHandle, rootHandleName, onCacheFiles,
     onAddDescriptors, onAddJudges, onMergeJudges, availableJudges = [], availableDescriptors = []
 }) => {
   const [processing, setProcessing] = useState(false);
@@ -72,18 +74,16 @@ const ProcessingModule: React.FC<Props> = ({
         setLogs(prev => [...prev, `[${i + 1}/${newFiles.length}] A analisar: ${file.name}...`]);
         
         let data = await extractDataFromPdf(file);
-        const isDataMissing = data.relator === 'Desconhecido' || data.data === 'N/D';
-        const isSumarioMissing = data.sumario.includes('Sumário não identificado');
-        const isTagsMissing = !data.descritores || data.descritores.length === 0;
-
-        if (isDataMissing || isSumarioMissing || isTagsMissing) {
+        
+        // Se a chave estiver presente, vamos otimizar com IA
+        if (apiKey && apiKey.length > 10) {
             try {
                 const textLen = data.textoCompleto.length;
                 const context = textLen < 15000 
                     ? data.textoCompleto 
                     : data.textoCompleto.substring(0, 8000) + "\n...[EXCERTO JURISPRUDENCIAL]...\n" + data.textoCompleto.substring(textLen - 6000);
 
-                const aiResult = await extractMetadataWithAI(context);
+                const aiResult = await extractMetadataWithAI(apiKey, context);
                 if (aiResult) {
                     if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
                     if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
@@ -92,9 +92,11 @@ const ProcessingModule: React.FC<Props> = ({
                     if (aiResult.descritores && aiResult.descritores.length > 0) {
                         data.descritores = aiResult.descritores.filter((d:string)=>d!=='N/D');
                     }
-                    setLogs(prev => [...prev, `✨ Metadados e Descritores otimizados via IA para ${file.name}`]);
+                    setLogs(prev => [...prev, `✨ IA: Metadados e ${data.descritores.length} descritores extraídos para ${file.name}`]);
                 }
-            } catch (aiError) {}
+            } catch (aiError) {
+                setLogs(prev => [...prev, `⚠️ IA falhou para ${file.name}, usando extração local.`]);
+            }
         }
         newData.push(data);
       } catch (err) {
@@ -155,30 +157,39 @@ const ProcessingModule: React.FC<Props> = ({
           <FolderUp className="w-7 h-7 text-legal-600" /> Importar Acórdãos
         </h2>
         
-        {showLegacyFallback ? (
-            <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-3xl mb-4">
-                <div className="flex gap-4 items-start">
-                    <div className="p-3 bg-amber-100 rounded-2xl"><Info className="w-6 h-6 text-amber-600" /></div>
-                    <div className="flex-1">
-                        <p className="text-sm text-amber-900 font-black uppercase tracking-tight">Modo Manual</p>
-                        <p className="text-xs text-amber-700/80 mt-1 font-bold">Selecione os ficheiros PDF individualmente.</p>
-                        <button onClick={() => legacyInputRef.current?.click()} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">
-                            Selecionar PDFs
-                        </button>
+        <div className="flex flex-col gap-6">
+            {!apiKey && (
+                <div className="p-4 bg-orange-50 border border-orange-200 rounded-2xl flex items-center gap-3 text-orange-700">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+                    <p className="text-xs font-bold">Aviso: Sem chave de API, o processamento será limitado à extração local de texto (sem otimização de metadados por IA).</p>
+                </div>
+            )}
+            
+            {showLegacyFallback ? (
+                <div className="bg-amber-50 border-2 border-amber-100 p-6 rounded-3xl mb-4">
+                    <div className="flex gap-4 items-start">
+                        <div className="p-3 bg-amber-100 rounded-2xl"><Info className="w-6 h-6 text-amber-600" /></div>
+                        <div className="flex-1">
+                            <p className="text-sm text-amber-900 font-black uppercase tracking-tight">Modo Manual</p>
+                            <p className="text-xs text-amber-700/80 mt-1 font-bold">Selecione os ficheiros PDF individualmente.</p>
+                            <button onClick={() => legacyInputRef.current?.click()} className="mt-4 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl">
+                                Selecionar PDFs
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        ) : (
-            <div className="flex flex-col gap-6">
-              <div className="flex items-center gap-4">
-                <button onClick={handleSelectFolder} disabled={processing} className="bg-legal-900 hover:bg-black text-white px-8 py-4 rounded-[20px] flex items-center gap-3 disabled:opacity-50 transition-all shadow-2xl active:scale-95 group font-black text-xs uppercase tracking-widest">
-                  {processing ? <RefreshCw className="animate-spin w-5 h-5"/> : <FilePlus className="w-5 h-5 group-hover:scale-110 transition-transform"/>}
-                  {rootHandleName ? `Pasta: ${rootHandleName}` : 'Selecionar Pasta de PDFs'}
-                </button>
-                {rootHandleName && <span className="text-[10px] text-green-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-green-50 px-4 py-2 rounded-full border border-green-100"><CheckCircle className="w-4 h-4"/> Ativa</span>}
-              </div>
-            </div>
-        )}
+            ) : (
+                <div className="flex flex-col gap-6">
+                  <div className="flex items-center gap-4">
+                    <button onClick={handleSelectFolder} disabled={processing} className="bg-legal-900 hover:bg-black text-white px-8 py-4 rounded-[20px] flex items-center gap-3 disabled:opacity-50 transition-all shadow-2xl active:scale-95 group font-black text-xs uppercase tracking-widest">
+                      {processing ? <RefreshCw className="animate-spin w-5 h-5"/> : <FilePlus className="w-5 h-5 group-hover:scale-110 transition-transform"/>}
+                      {rootHandleName ? `Pasta: ${rootHandleName}` : 'Selecionar Pasta de PDFs'}
+                    </button>
+                    {rootHandleName && <span className="text-[10px] text-green-600 font-black uppercase tracking-widest flex items-center gap-1.5 bg-green-50 px-4 py-2 rounded-full border border-green-100"><CheckCircle className="w-4 h-4"/> Ativa</span>}
+                  </div>
+                </div>
+            )}
+        </div>
         <input type="file" ref={legacyInputRef} className="hidden" onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             const fileList = e.target.files;
             if (!fileList) return;

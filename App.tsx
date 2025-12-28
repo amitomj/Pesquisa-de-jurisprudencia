@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -23,42 +23,40 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
+  
+  // BYOK: Bring Your Own Key implementation
+  const [userApiKey, setUserApiKey] = useState<string>(() => {
+    return localStorage.getItem('juris_gemini_api_key') || '';
+  });
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const checkKey = async () => {
-      try {
-        // @ts-ignore
-        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
-          const has = await window.aistudio.hasSelectedApiKey();
-          setHasApiKey(has);
-        } else {
-          // Fallback check se a chave foi injetada mas o aistudio object não está presente
-          setHasApiKey(!!process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY.length > 10);
-        }
-      } catch (e) {
-        setHasApiKey(false);
-      }
-    };
-    checkKey();
-    const interval = setInterval(checkKey, 2000);
-    return () => clearInterval(interval);
-  }, []);
+    setHasApiKey(userApiKey.trim().length >= 20);
+  }, [userApiKey]);
 
-  const handleSetupKey = async () => {
-    try {
-      // @ts-ignore
-      if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-        await window.aistudio.openSelectKey();
-        setHasApiKey(true); // Assume sucesso conforme guia
-      } else {
-        alert("Ambiente de configuração de chave não detetado. Certifique-se que está a usar o ambiente adequado.");
-      }
-    } catch (e) {
-      console.error("Erro ao abrir seletor de chave:", e);
+  const handleSetupKey = () => {
+    const currentMsg = userApiKey ? `\n\n(A sua chave atual termina em ...${userApiKey.slice(-4)})` : '';
+    const key = window.prompt(
+      'Cole aqui a sua Gemini API Key.\nEsta chave será guardada apenas neste browser para processar os seus documentos.' + currentMsg,
+      userApiKey
+    );
+
+    if (key === null) return; // Cancelado
+
+    const trimmed = key.trim();
+    if (trimmed && trimmed.length < 20) {
+      alert('A chave introduzida parece ser demasiado curta ou inválida.');
+      return;
+    }
+
+    setUserApiKey(trimmed);
+    if (trimmed) {
+      localStorage.setItem('juris_gemini_api_key', trimmed);
+    } else {
+      localStorage.removeItem('juris_gemini_api_key');
     }
   };
 
@@ -223,8 +221,8 @@ function App() {
               onClick={handleSetupKey}
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${hasApiKey ? 'bg-green-600/20 border border-green-500/50 text-green-400' : 'bg-orange-600 text-white animate-pulse'}`}
             >
-              {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <AlertTriangle className="w-4 h-4"/>}
-              {hasApiKey ? 'IA Ativa' : 'Configurar IA'}
+              {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <Key className="w-4 h-4"/>}
+              {hasApiKey ? 'IA Pronta' : 'Configurar Chave'}
             </button>
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-1"></div>
             <div className="flex bg-legal-800 rounded-2xl p-1 gap-1">
@@ -250,6 +248,7 @@ function App() {
         <div className="flex-1 overflow-hidden bg-gray-50 relative">
             {activeTab === 'process' && (
               <ProcessingModule 
+                apiKey={userApiKey}
                 onDataLoaded={d => setDb(p => [...p, ...d])} 
                 existingDB={db} 
                 onSetRootHandle={handleSetRoot} 
@@ -264,6 +263,7 @@ function App() {
             )}
             {activeTab === 'search' && (
               <SearchModule 
+                apiKey={userApiKey}
                 db={db} 
                 onSaveSearch={s => setSavedSearches(p => [...p, s])} 
                 savedSearches={savedSearches} 
@@ -277,7 +277,16 @@ function App() {
                 onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}
               />
             )}
-            {activeTab === 'chat' && <ChatModule db={db} sessions={chatSessions} onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} onOpenPdf={openPdf}/>}
+            {activeTab === 'chat' && (
+              <ChatModule 
+                apiKey={userApiKey}
+                db={db} 
+                sessions={chatSessions} 
+                onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} 
+                onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} 
+                onOpenPdf={openPdf}
+              />
+            )}
         </div>
       </div>
       <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>

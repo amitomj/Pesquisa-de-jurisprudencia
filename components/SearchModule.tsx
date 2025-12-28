@@ -84,6 +84,7 @@ const PdfViewer: React.FC<{ data: ArrayBuffer | null }> = ({ data }) => {
 };
 
 interface Props {
+  apiKey: string;
   db: Acordao[];
   onSaveSearch: (result: SearchResult) => void;
   savedSearches: SearchResult[];
@@ -100,7 +101,7 @@ interface Props {
 const ITEMS_PER_PAGE = 20;
 
 const SearchModule: React.FC<Props> = ({ 
-    db, onOpenPdf, onGetPdfData, onUpdateAcordao, availableDescriptors, availableJudges
+    apiKey, db, onOpenPdf, onGetPdfData, onUpdateAcordao, availableDescriptors, availableJudges
 }) => {
   const initialFilters: SearchFilters = {
     processo: '', relator: '', adjunto: '', descritor: '', dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
@@ -168,6 +169,10 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
+      if (!apiKey) {
+          alert('Por favor, configure a sua API Key no topo da aplicação.');
+          return;
+      }
       setIsProcessingSingle(item.id);
       try {
           const textLen = item.textoCompleto.length;
@@ -175,7 +180,7 @@ const SearchModule: React.FC<Props> = ({
             ? item.textoCompleto 
             : item.textoCompleto.substring(0, 8000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 7000);
           
-          const aiResult = await extractMetadataWithAI(context);
+          const aiResult = await extractMetadataWithAI(apiKey, context);
           if (!aiResult) return;
 
           const updated = { ...item };
@@ -197,6 +202,10 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processInBulk = async (mode: 'sumario' | 'dados') => {
+      if (!apiKey) {
+          alert('Por favor, configure a sua API Key no topo da aplicação.');
+          return;
+      }
       const itemsToProcess = results.filter(item => {
           if (mode === 'sumario') return !item.sumario || item.sumario.length < 50 || item.sumario.includes('Sumário não identificado');
           if (mode === 'dados') return item.relator === 'Desconhecido' || item.data === 'N/D';
