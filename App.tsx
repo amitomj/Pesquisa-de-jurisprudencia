@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ArrowRight, RotateCcw, Info, Sparkles, ExternalLink, Eye, EyeOff, LogOut } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, Info, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -23,25 +23,43 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   
-  // @google/genai guidelines: Removed manual API key management states.
-  
-  // Onboarding Step - Skip welcome screen as API key management is external.
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const has = await window.aistudio.hasSelectedApiKey();
+        setHasApiKey(has);
+      }
+    };
+    checkKey();
+    // Re-check periodically
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleSetupKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Assume success as per guidelines to mitigate race condition
+      setHasApiKey(true);
+    }
+  };
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
   };
 
-  // --- Lógica de Base de Dados ---
   const updateJudgesList = (currentDb: Acordao[]) => {
     const extracted = new Set<string>();
     currentDb.forEach(ac => {
       if (ac.relator && ac.relator !== 'Desconhecido') extracted.add(ac.relator.trim());
-      ac.adjuntos.forEach(adj => { if (adj) extracted.add(adj.trim()); });
+      ac.adjuntos.forEach(adj => { if (adj && adj !== 'Nenhum') extracted.add(adj.trim()); });
     });
     setJudges(Array.from(extracted).sort());
   };
@@ -127,37 +145,35 @@ function App() {
     reader.readAsText(file);
   };
 
-  // --- RENDER ONBOARDING ---
   if (onboardingStep !== 'app') {
     return (
       <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-        <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center animate-in zoom-in-95 duration-500 border border-slate-700/50">
-            <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="mb-10 flex justify-center">
-                <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20 shadow-inner">
-                  <Sparkles className="w-12 h-12 text-blue-500"/>
-                </div>
+        <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50">
+            <div className="mb-10 flex justify-center">
+              <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
+                <ScaleIcon className="w-12 h-12 text-blue-500"/>
               </div>
-              <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">Área Jurídica</h2>
-              <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição para carregar os descritores adequados.</p>
-              
-              <div className="grid grid-cols-1 gap-4">
-                {['social', 'crime', 'civil'].map((area: any) => (
-                  <button 
-                    key={area} 
-                    onClick={() => selectLegalArea(area)} 
-                    className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
-                  >
-                    <div className="p-4 bg-slate-700 rounded-2xl border border-slate-600 group-hover:border-blue-900 transition-all shadow-xl group-hover:bg-blue-900/20">
-                      {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
-                    </div>
-                    <div>
-                        <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Aceder ao Painel</div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            </div>
+            <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">Área Jurídica</h2>
+            <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
+            
+            <div className="grid grid-cols-1 gap-4">
+              {['social', 'crime', 'civil'].map((area: any) => (
+                <button 
+                  key={area} 
+                  onClick={() => selectLegalArea(area)} 
+                  className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
+                >
+                  <div className="p-4 bg-slate-700 rounded-2xl group-hover:bg-blue-900/20 transition-all">
+                    {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
+                  </div>
+                  <div>
+                      <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Iniciar Sessão</div>
+                  </div>
+                </button>
+              ))}
+              <button onClick={() => fileInputRef.current?.click()} className="mt-4 text-xs text-blue-400 hover:underline font-bold uppercase tracking-widest">Ou Carregar Cópia de Segurança (.json)</button>
             </div>
         </div>
         <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
@@ -165,7 +181,6 @@ function App() {
     );
   }
 
-  // --- APP MAIN INTERFACE ---
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 font-sans selection:bg-legal-100">
       <header className="bg-legal-900 text-white shadow-xl z-50 flex-shrink-0">
@@ -177,25 +192,27 @@ function App() {
             <div>
               <h1 className="text-2xl font-black tracking-tighter leading-none uppercase">JurisAnalítica</h1>
               <div className="flex items-center gap-2 mt-1">
-                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">Sessão: {legalArea}</p>
+                <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">{legalArea}</p>
                 <button onClick={() => setOnboardingStep('area')} className="text-[9px] bg-legal-700 hover:bg-legal-600 px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 transition-all">
-                   <RotateCcw className="w-2.5 h-2.5" /> Mudar Área
+                   <RotateCcw className="w-2.5 h-2.5" /> Mudar
                 </button>
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end mr-2">
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-500/30 rounded-full group">
-                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-[9px] font-black uppercase tracking-widest text-green-400">IA Ativa</span>
-                </div>
-            </div>
+            <button 
+              onClick={handleSetupKey}
+              className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${hasApiKey ? 'bg-green-600/20 border border-green-500/50 text-green-400' : 'bg-orange-600 text-white animate-pulse'}`}
+            >
+              {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <AlertTriangle className="w-4 h-4"/>}
+              {hasApiKey ? 'Chave Ativa' : 'Configurar Chave API'}
+            </button>
+
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
-            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all px-2">Importar</button>
+            
             <button onClick={handleSaveDb} className="flex items-center gap-2.5 px-6 py-3 bg-white text-legal-900 hover:bg-legal-100 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
-              <Save className="w-4 h-4" /> Exportar Backup
+              <Save className="w-4 h-4" /> Backup
             </button>
           </div>
         </div>
@@ -239,7 +256,21 @@ function App() {
                    availableDescriptors={legalArea?descriptors[legalArea]:[]}
                  />
                )}
-               {activeTab === 'search' && <SearchModule db={db} onSaveSearch={s => setSavedSearches(p => [...p, s])} savedSearches={savedSearches} onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} onOpenPdf={openPdf} onGetPdfData={getPdfData} onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} availableDescriptors={legalArea?descriptors[legalArea]:[]} availableJudges={judges} onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}/>}
+               {activeTab === 'search' && (
+                 <SearchModule 
+                    db={db} 
+                    onSaveSearch={s => setSavedSearches(p => [...p, s])} 
+                    savedSearches={savedSearches} 
+                    onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} 
+                    onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} 
+                    onOpenPdf={openPdf} 
+                    onGetPdfData={getPdfData} 
+                    onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
+                    availableDescriptors={legalArea?descriptors[legalArea]:[]} 
+                    availableJudges={judges} 
+                    onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}
+                 />
+               )}
                {activeTab === 'chat' && <ChatModule db={db} sessions={chatSessions} onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} onOpenPdf={openPdf}/>}
             </div>
           </>

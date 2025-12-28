@@ -3,12 +3,12 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
 const getAIInstance = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
-};
-
-const handleAIError = async (error: any) => {
-  console.error("Gemini Service Error Detail:", error);
-  throw error;
+  // Conforme as diretrizes, utiliza estritamente process.env.API_KEY
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey === "undefined") {
+    throw new Error("API_KEY_NOT_SET");
+  }
+  return new GoogleGenAI({ apiKey });
 };
 
 export const generateLegalAnswer = async (
@@ -18,46 +18,56 @@ export const generateLegalAnswer = async (
   try {
     const ai = getAIInstance();
     const relevantContext = context.map(c => 
-      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 800)}...`
+      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nData: ${c.data}\nRelator: ${c.relator}\nSumário: ${c.sumario}\nExcerto: ${c.textoAnalise.substring(0, 1000)}...`
     ).join('\n---\n');
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analisa os acórdãos e responde à questão.\nCONTEXTO:\n${relevantContext}\n\nQUESTÃO: ${question}`,
+      contents: `Analisa os acórdãos e responde à questão. Se inconclusivo, avisa. Usa citações.
+
+CONTEXTO:
+${relevantContext}
+
+QUESTÃO: 
+${question}`,
       config: {
-        systemInstruction: "És um consultor jurídico português. Usa citações precisas. Se não tiveres dados suficientes, informa o utilizador.",
+        systemInstruction: "És um consultor jurídico especializado em acórdãos portugueses. Resposta técnica e precisa.",
         temperature: 0.1,
         thinkingConfig: { thinkingBudget: 4000 }
       }
     });
 
-    return response.text || "Sem resposta disponível.";
-  } catch (error) {
-    await handleAIError(error);
-    return "Erro no processamento da consulta. Tente novamente em instantes.";
+    return response.text || "Sem resposta.";
+  } catch (error: any) {
+    if (error.message === "API_KEY_NOT_SET") return "Configure a sua chave de API no botão superior para usar a IA.";
+    console.error("Erro IA:", error);
+    return "Falha na IA. Verifique a sua conexão ou chave.";
   }
 };
 
 export const extractMetadataWithAI = async (textContext: string): Promise<any> => {
   try {
     const ai = getAIInstance();
-    // Prompt mais robusto focado em acórdãos portugueses
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Instrução Crítica: Analisa este acórdão e extrai os metadados rigorosamente no formato JSON solicitado. 
-Se o sumário for longo, extrai a versão integral sem resumir excessivamente.
-Se não encontrares um dado, coloca "N/D".
-TEXTO DO ACÓRDÃO:
+      contents: `Extrai os metadados do acórdão em JSON.
+REGRAS:
+1. SUMÁRIO: Extrai o texto INTEGRAL. Não resumas.
+2. DATA: DD-MM-AAAA.
+3. MAGISTRADOS: Relator e Adjuntos completos.
+4. "N/D" se em falta.
+
+TEXTO:
 ${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            data: { type: Type.STRING, description: "Data no formato DD-MM-AAAA" },
-            relator: { type: Type.STRING, description: "Nome do Juiz Relator principal" },
-            adjuntos: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista de Juízes Adjuntos" },
-            sumario: { type: Type.STRING, description: "Texto completo do sumário/conclusões" }
+            data: { type: Type.STRING },
+            relator: { type: Type.STRING },
+            adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
+            sumario: { type: Type.STRING }
           },
           required: ["data", "relator", "adjuntos", "sumario"]
         }
@@ -65,7 +75,7 @@ ${textContext}`,
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
-    await handleAIError(error);
+    return null;
   }
 };
 
@@ -74,7 +84,7 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
      const ai = getAIInstance();
      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Escolhe os 3 descritores mais adequados da lista fornecida para este sumário jurídico.\nSUMÁRIO: ${summary}\nLISTA DE DESCRITORES VÁLIDOS: ${JSON.stringify(validDescriptors)}`,
+        contents: `Escolha os 3 descritores mais relevantes.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
