@@ -49,23 +49,27 @@ export interface SearchResult {
   date: number;
 }
 
-/**
- * Interface representing the AI Studio environment controls.
- * Matches environmental global definitions to prevent type mismatch errors.
- */
-export interface AIStudio {
-  hasSelectedApiKey: () => Promise<boolean>;
-  openSelectKey: () => Promise<void>;
-}
-
 declare global {
+  /**
+   * Interface representing the AI Studio environment controls.
+   * Defined globally to match environment definitions and avoid type name collisions.
+   */
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+
   interface Window {
     pdfjsLib: any;
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
     /**
-     * aistudio property is often injected by the environment as a readonly property of type AIStudio.
-     * Fixing modifier mismatch by adding readonly and using the named AIStudio interface.
+     * aistudio property is injected by the environment.
+     * Fixed: removed 'readonly' and matching the global interface declaration 
+     * to resolve modifier mismatch and type collision errors.
      */
-    readonly aistudio: AIStudio;
+    aistudio: AIStudio;
   }
 }
+
+// Exporting the type for explicit imports if needed by other components.
+export type { AIStudio };
