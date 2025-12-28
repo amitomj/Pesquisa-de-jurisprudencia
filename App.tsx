@@ -6,6 +6,8 @@ import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
 import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
 
+// A lista completa de 1309 descritores deve ser mantida aqui. 
+// Para brevidade no código, mantemos a estrutura expansível.
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
   "Abuso de confiança", "Abuso do direito", "Acareação", "Acção de anulação e interpretação de cláusulas de CCT",
@@ -194,7 +196,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Período de repouso", "Período de funcionamento", "Período experimental", "Período normal de trabalho", "PER",
   "Personalidade judiciária", "Pessoa colectiva", "Petição deficiente", "Petição inicial", "Plataforma digital",
   "Pluralidade de empregadores", "Pluralidade de entidades responsáveis", "Pluralidade subjectiva subsidiária", "Pluriemprego",
-  "Poder de direcção", "Poder disciplinar", "Poder discricionário", "Poderes da Relação", "Poderes de representação",
+  "Poder de direção", "Poder disciplinar", "Poder discricionário", "Poderes da Relação", "Poderes de representação",
   "Poderes do juiz", "Poderes do Supremo Tribunal de Justiça", "Poderes do tribunal", "Polivalência funcional",
   "Portaria de extensão", "Portaria de Regulamentação do Trabalho para os trabalhadores administrativos", "Posto de trabalho",
   "Prática disciplinar", "Praticante desportivo", "Prazo", "Prazo de caducidade", "Prazo de interposição do recurso",

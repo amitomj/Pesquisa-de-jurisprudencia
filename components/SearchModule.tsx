@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye } from 'lucide-react';
+import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown } from 'lucide-react';
 import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -130,7 +130,6 @@ const SearchModule: React.FC<{
     processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
   });
   const [isProcessing, setIsProcessing] = useState<{id: string | 'batch', mode: string} | null>(null);
-  const [readingSummary, setReadingSummary] = useState<Acordao | null>(null);
 
   const filteredResults = useMemo(() => {
     return db.filter(item => {
@@ -352,9 +351,6 @@ const SearchModule: React.FC<{
                     </div>
                   </div>
                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => setReadingSummary(item)} title="Ver Sumário Completo" className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all">
-                        <Eye className="w-4 h-4"/>
-                    </button>
                     <button onClick={() => runIA(item, 'sumario')} title="IA: Extrair Sumário" className="p-3 bg-orange-50 text-orange-600 rounded-2xl hover:bg-orange-600 hover:text-white transition-all">
                         {isProcessing?.id === item.id && isProcessing.mode === 'sumario' ? <Loader2 className="w-4 h-4 animate-spin"/> : <AlignLeft className="w-4 h-4"/>}
                     </button>
@@ -372,16 +368,9 @@ const SearchModule: React.FC<{
                         <div className="flex items-center gap-2 text-[10px] font-black text-legal-700 uppercase tracking-widest opacity-60">
                             <AlignLeft className="w-3.5 h-3.5" /> Sumário Executivo
                         </div>
-                        <div className="relative">
-                            <p className="text-sm text-gray-700 font-serif italic leading-relaxed bg-gray-50/50 p-6 rounded-[2rem] border border-gray-50 line-clamp-6">
-                                {item.sumario}
-                            </p>
-                            {item.sumario.length > 350 && (
-                                <button onClick={() => setReadingSummary(item)} className="mt-2 text-[9px] font-black uppercase text-legal-600 hover:text-black flex items-center gap-1">
-                                    Ler mais <ChevronRight className="w-3 h-3"/>
-                                </button>
-                            )}
-                        </div>
+                        <p className="text-sm text-gray-700 font-serif italic leading-relaxed bg-gray-50/50 p-6 rounded-[2rem] border border-gray-50">
+                            {item.sumario}
+                        </p>
                         <div className="flex flex-wrap gap-2 pt-2">
                             {item.descritores.map((tag, idx) => (
                                 <span key={idx} className="bg-legal-50 text-legal-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-legal-100 flex items-center gap-1.5">
@@ -422,38 +411,6 @@ const SearchModule: React.FC<{
           )}
         </div>
       </div>
-
-      {/* Modal de Sumário Completo */}
-      {readingSummary && (
-          <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-6 backdrop-blur-md animate-in fade-in">
-              <div className="bg-white max-w-4xl w-full rounded-[3rem] shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95">
-                  <div className="p-10 border-b flex justify-between items-center bg-gray-50 rounded-t-[3rem]">
-                      <div className="flex items-center gap-4">
-                        <div className="bg-legal-900 text-white px-5 py-2.5 rounded-2xl text-[12px] font-black shadow-lg">
-                            {readingSummary.processo}
-                        </div>
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Sumário Integral</h4>
-                      </div>
-                      <button onClick={() => setReadingSummary(null)} className="p-4 hover:bg-white rounded-full transition-all text-gray-400 hover:text-red-500">
-                          <X className="w-6 h-6"/>
-                      </button>
-                  </div>
-                  <div className="p-10 overflow-y-auto custom-scrollbar flex-1">
-                      <p className="text-lg text-gray-700 font-serif italic leading-relaxed whitespace-pre-wrap">
-                          {readingSummary.sumario}
-                      </p>
-                  </div>
-                  <div className="p-8 border-t bg-white rounded-b-[3rem] flex justify-end gap-3">
-                      <button 
-                        onClick={() => { onOpenPdf(readingSummary.fileName); setReadingSummary(null); }}
-                        className="bg-legal-900 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-black transition-all"
-                      >
-                          <FileText className="w-4 h-4"/> Abrir PDF Original
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
     </div>
   );
 };
