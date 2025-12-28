@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Acordao, SearchFilters, SearchResult } from '../types';
-import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck, Tag, Eraser, AlignLeft } from 'lucide-react';
+import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck, Tag, Eraser, AlignLeft, Plus, Trash2 } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const parseDate = (dateStr: string): number => {
@@ -117,6 +117,8 @@ const SearchModule: React.FC<Props> = ({
   const [summaryView, setSummaryView] = useState<Acordao | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isProcessingSingle, setIsProcessingSingle] = useState<string | null>(null);
+  const [isProcessingBulk, setIsProcessingBulk] = useState<boolean>(false);
+  const [newTagInput, setNewTagInput] = useState('');
 
   useEffect(() => {
     handleSearch();
@@ -193,11 +195,29 @@ const SearchModule: React.FC<Props> = ({
       }
   };
 
+  const processInBulk = async (mode: 'sumario' | 'dados') => {
+      const itemsToProcess = results.filter(item => {
+          if (mode === 'sumario') return !item.sumario || item.sumario.length < 50 || item.sumario.includes('Sumário não identificado');
+          if (mode === 'dados') return item.relator === 'Desconhecido' || item.data === 'N/D';
+          return false;
+      });
+
+      if (itemsToProcess.length === 0) return;
+      if (!confirm(`Deseja processar ${itemsToProcess.length} acórdãos com IA?`)) return;
+
+      setIsProcessingBulk(true);
+      for (const item of itemsToProcess) {
+          await processSingle(item, mode);
+      }
+      setIsProcessingBulk(false);
+  };
+
   const openCorrection = (item: Acordao) => {
     setCorrectionMode(item);
     const adjs = [...(item.adjuntos || [])];
     while (adjs.length < 2) adjs.push('Nenhum');
     setCorrectionForm({...item, adjuntos: adjs, descritores: item.descritores || []});
+    setNewTagInput('');
   };
 
   const saveCorrection = () => {
@@ -213,6 +233,27 @@ const SearchModule: React.FC<Props> = ({
       const newAdjuntos = [...correctionForm.adjuntos];
       newAdjuntos[index] = name;
       setCorrectionForm({...correctionForm, adjuntos: newAdjuntos});
+  };
+
+  const addTag = () => {
+      if (!correctionForm || !newTagInput.trim()) return;
+      if (correctionForm.descritores.includes(newTagInput.trim())) {
+          setNewTagInput('');
+          return;
+      }
+      setCorrectionForm({
+          ...correctionForm,
+          descritores: [...correctionForm.descritores, newTagInput.trim()]
+      });
+      setNewTagInput('');
+  };
+
+  const removeTag = (tag: string) => {
+      if (!correctionForm) return;
+      setCorrectionForm({
+          ...correctionForm,
+          descritores: correctionForm.descritores.filter(t => t !== tag)
+      });
   };
 
   const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
@@ -245,24 +286,41 @@ const SearchModule: React.FC<Props> = ({
                     <p className="text-[10px] font-black uppercase tracking-widest">Análise de Qualidade</p>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                    <button 
-                        onClick={() => { setShowMissingSummary(!showMissingSummary); setShowMissingData(false); }} 
-                        className={`w-full flex items-center justify-between p-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${showMissingSummary ? 'bg-orange-600 text-white border-orange-500 shadow-lg' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200'}`}
-                    >
-                        <span>Sem Sumário</span>
-                        <div className={`px-2 py-0.5 rounded-full text-[9px] ${showMissingSummary ? 'bg-orange-800' : 'bg-gray-100 text-gray-400'}`}>
-                            {db.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('não identificado')).length}
-                        </div>
-                    </button>
-                    <button 
-                        onClick={() => { setShowMissingData(!showMissingData); setShowMissingSummary(false); }} 
-                        className={`w-full flex items-center justify-between p-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${showMissingData ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-white text-gray-500 border-gray-100 hover:border-blue-200'}`}
-                    >
-                        <span>Metadados em falta</span>
-                        <div className={`px-2 py-0.5 rounded-full text-[9px] ${showMissingData ? 'bg-blue-800' : 'bg-gray-100 text-gray-400'}`}>
-                            {db.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D').length}
-                        </div>
-                    </button>
+                    <div className="space-y-1">
+                        <button 
+                            onClick={() => { setShowMissingSummary(!showMissingSummary); setShowMissingData(false); }} 
+                            className={`w-full flex items-center justify-between p-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${showMissingSummary ? 'bg-orange-600 text-white border-orange-500 shadow-lg' : 'bg-white text-gray-500 border-gray-100 hover:border-orange-200'}`}
+                        >
+                            <span>Sem Sumário</span>
+                            <div className={`px-2 py-0.5 rounded-full text-[9px] ${showMissingSummary ? 'bg-orange-800' : 'bg-gray-100 text-gray-400'}`}>
+                                {db.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('não identificado')).length}
+                            </div>
+                        </button>
+                        {showMissingSummary && results.length > 0 && (
+                            <button onClick={() => processInBulk('sumario')} disabled={isProcessingBulk} className="w-full mt-1 bg-orange-100 text-orange-700 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-orange-200 transition-all">
+                                {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin"/> : <Zap className="w-3 h-3"/>}
+                                Corrigir Todos (IA)
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="space-y-1 mt-2">
+                        <button 
+                            onClick={() => { setShowMissingData(!showMissingData); setShowMissingSummary(false); }} 
+                            className={`w-full flex items-center justify-between p-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border-2 ${showMissingData ? 'bg-blue-600 text-white border-blue-500 shadow-lg' : 'bg-white text-gray-500 border-gray-100 hover:border-blue-200'}`}
+                        >
+                            <span>Metadados em falta</span>
+                            <div className={`px-2 py-0.5 rounded-full text-[9px] ${showMissingData ? 'bg-blue-800' : 'bg-gray-100 text-gray-400'}`}>
+                                {db.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D').length}
+                            </div>
+                        </button>
+                        {showMissingData && results.length > 0 && (
+                            <button onClick={() => processInBulk('dados')} disabled={isProcessingBulk} className="w-full mt-1 bg-blue-100 text-blue-700 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-200 transition-all">
+                                {isProcessingBulk ? <Loader2 className="w-3 h-3 animate-spin"/> : <Zap className="w-3 h-3"/>}
+                                Corrigir Todos (IA)
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -499,6 +557,40 @@ const SearchModule: React.FC<Props> = ({
                                         <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 rotate-90 pointer-events-none" />
                                     </div>
                                 </div>
+                             </div>
+                        </div>
+
+                        {/* Gestor de Descritores com Autocompletar */}
+                        <div className="pt-4 border-t border-gray-200">
+                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">Descritores / Temas</label>
+                             <div className="flex flex-wrap gap-2 mb-3 min-h-[40px] p-3 bg-white border border-gray-200 rounded-2xl shadow-inner">
+                                {correctionForm.descritores.length === 0 ? (
+                                    <span className="text-[10px] font-bold text-gray-300 uppercase py-1">Nenhum descritor adicionado</span>
+                                ) : (
+                                    correctionForm.descritores.map(tag => (
+                                        <div key={tag} className="flex items-center gap-1 bg-legal-50 text-legal-800 text-[10px] font-black px-3 py-1.5 rounded-xl border border-legal-200 animate-in zoom-in">
+                                            {tag}
+                                            <button onClick={() => removeTag(tag)} className="hover:text-red-500 p-0.5"><X className="w-3 h-3"/></button>
+                                        </div>
+                                    ))
+                                )}
+                             </div>
+                             <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input 
+                                        type="text" 
+                                        list="available-tags"
+                                        className="w-full p-3 bg-white border border-gray-300 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-legal-600"
+                                        placeholder="Novo descritor..."
+                                        value={newTagInput}
+                                        onChange={e => setNewTagInput(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                                    />
+                                    <datalist id="available-tags">
+                                        {availableDescriptors.map(d => <option key={d} value={d} />)}
+                                    </datalist>
+                                </div>
+                                <button onClick={addTag} className="bg-legal-100 text-legal-900 p-3 rounded-xl hover:bg-legal-200 transition-all"><Plus className="w-5 h-5"/></button>
                              </div>
                         </div>
 

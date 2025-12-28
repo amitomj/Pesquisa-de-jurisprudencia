@@ -46,7 +46,7 @@ function App() {
       }
     };
     checkKey();
-    const interval = setInterval(checkKey, 2000);
+    const interval = setInterval(checkKey, 1000); // Frequência aumentada para 1s
     return () => clearInterval(interval);
   }, []);
 
@@ -55,11 +55,10 @@ function App() {
       // @ts-ignore
       if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
         await window.aistudio.openSelectKey();
+        // Conforme as regras de race condition, assumimos sucesso após o trigger
         setHasApiKey(true);
       } else {
-        // Se o seletor não abrir, pode ser que o ambiente não o forneça, 
-        // mas tentamos forçar o check de novo
-        console.log("Tentativa de abertura de chave via sistema...");
+        console.warn("Ambiente AI Studio não detetado para seleção de chave.");
       }
     } catch (e) {
       console.error("Erro ao abrir seletor de chave:", e);
