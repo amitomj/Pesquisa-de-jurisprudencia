@@ -107,17 +107,6 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
              <div className="h-full flex flex-col items-center justify-center text-gray-400 animate-in fade-in zoom-in duration-700">
                 <div className="p-8 bg-white rounded-3xl shadow-xl mb-6 border border-gray-100"><Scale className="w-16 h-16 text-legal-100"/></div>
                 <h3 className="text-xl font-bold text-gray-800">Consultoria Jurídica IA</h3>
-                
-                {/* Nota de API Key */}
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-100 rounded-2xl max-w-md text-center">
-                    <div className="flex items-center justify-center gap-2 text-blue-800 font-bold text-sm mb-1">
-                        <Key className="w-4 h-4"/> Gestão de Chave API
-                    </div>
-                    <p className="text-blue-700 text-xs leading-relaxed">
-                        Por omissão, usamos a nossa chave gratuita. Se tiver um plano <b>"Pay-as-you-go"</b>, utilize o botão no topo para configurar a sua própria chave e obter respostas mais rápidas e detalhadas.
-                        <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="inline-flex items-center gap-1 ml-1 font-bold underline">Billing Docs <ExternalLink className="w-3 h-3"/></a>
-                    </p>
-                </div>
              </div>
           ) : (
              currentSession.messages.map(msg => {

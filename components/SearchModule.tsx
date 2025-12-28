@@ -89,6 +89,7 @@ interface Props {
   savedSearches: SearchResult[];
   onDeleteSearch: (id: string) => void;
   onUpdateSearchName: (id: string, name: string) => void;
+  // Fix: Removed duplicate onOpenPdf identifier
   onOpenPdf: (fileName: string) => void;
   onGetPdfData: (fileName: string) => Promise<ArrayBuffer | null>;
   onUpdateAcordao: (item: Acordao) => void;
@@ -157,13 +158,7 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const handleBatchAI = async (type: 'sumario' | 'missing') => {
-      // Verificação única e inicial da chave
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === 'undefined') {
-          alert("A chave de acesso não foi configurada. Por favor, utilize o botão 'Chave Ativa' no topo e selecione uma chave no diálogo do sistema.");
-          return;
-      }
-
+      // @google/genai guidelines: Remove manual API key checks as it is handled by the environment via process.env.API_KEY.
       const targetList = type === 'sumario' 
           ? results.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('Sumário não identificado'))
           : results.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D' || i.adjuntos.length === 0);
@@ -184,41 +179,33 @@ const SearchModule: React.FC<Props> = ({
       for (let i = 0; i < targetList.length; i++) {
           const item = targetList[i];
           setBatchProgress(prev => ({ ...prev, fileName: item.fileName }));
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           try {
               const textLen = item.textoCompleto.length;
               const context = textLen < 6000 ? item.textoCompleto : item.textoCompleto.substring(0, 3000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 3000);
               
               const aiResult = await extractMetadataWithAI(context);
               
-              if (!aiResult) {
-                  // Se o serviço falhar (ex: erro de chave capturado internamente), paramos o lote
-                  setIsBatchRunning(false);
-                  return;
+              if (aiResult) {
+                const updated = { ...item };
+                if (type === 'missing') {
+                    if (aiResult.data && aiResult.data !== 'N/D') updated.data = aiResult.data;
+                    if (aiResult.relator && aiResult.relator !== 'Desconhecido') updated.relator = aiResult.relator;
+                    if (aiResult.adjuntos) updated.adjuntos = aiResult.adjuntos;
+                } else {
+                    if (aiResult.sumario && aiResult.sumario.length > 50) updated.sumario = aiResult.sumario;
+                }
+                onUpdateAcordao(updated);
               }
 
-              const updated = { ...item };
-              if (type === 'missing') {
-                  if (aiResult.data && aiResult.data !== 'N/D') updated.data = aiResult.data;
-                  if (aiResult.relator && aiResult.relator !== 'Desconhecido') updated.relator = aiResult.relator;
-                  if (aiResult.adjuntos) updated.adjuntos = aiResult.adjuntos;
-              } else {
-                  if (aiResult.sumario && aiResult.sumario.length > 50) updated.sumario = aiResult.sumario;
-              }
-              
-              onUpdateAcordao(updated);
               setBatchProgress(prev => ({ 
                   ...prev, 
                   current: i + 1,
                   processedItems: [`Concluído: ${item.processo}`, ...prev.processedItems].slice(0, 5)
               }));
           } catch (e: any) { 
-              // Se for um erro de autenticação, para o loop imediatamente
-              if (e.message?.includes("CHAVE")) {
-                  alert("Erro de Chave de API: O processamento foi interrompido.");
-                  setIsBatchRunning(false);
-                  return;
-              }
-              
               setBatchProgress(prev => ({ 
                 ...prev, 
                 errorCount: prev.errorCount + 1,
@@ -230,12 +217,7 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey || apiKey === 'undefined') {
-          alert("Por favor, configure a chave de acesso no topo.");
-          return;
-      }
-
+      // @google/genai guidelines: Removed manual API key check.
       setIsProcessingSingle(item.id);
       try {
           const textLen = item.textoCompleto.length;
@@ -254,8 +236,7 @@ const SearchModule: React.FC<Props> = ({
           }
           onUpdateAcordao(updated);
       } catch (e: any) {
-          if (e.message?.includes("CHAVE")) alert("Erro de Chave API detetado.");
-          else console.error(e);
+          console.error(e);
       } finally {
           setIsProcessingSingle(null);
       }

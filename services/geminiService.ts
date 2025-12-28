@@ -2,31 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
+// @google/genai guidelines: Use process.env.API_KEY directly and do not manage keys in UI/localStorage.
 const getAIInstance = () => {
-  // Prioridade 1: Chave manual guardada no navegador pelo utilizador
-  const localKey = localStorage.getItem("GEMINI_API_KEY");
-  // Prioridade 2: Chave injetada pelo ambiente (se existir)
-  const apiKey = localKey || process.env.API_KEY;
-
-  if (!apiKey || apiKey === "undefined" || apiKey.trim() === "") {
-    throw new Error("API_KEY_MISSING");
-  }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const handleAIError = async (error: any) => {
-  console.error("Gemini Service Error:", error);
-  
-  if (error.message === "API_KEY_MISSING") {
-    throw new Error("CHAVE_EM_FALTA");
-  }
-
-  // Se a chave for inválida, removemos do localStorage para forçar nova entrada
-  if (error.message?.includes("API key not valid") || error.message?.includes("Requested entity was not found")) {
-    localStorage.removeItem("GEMINI_API_KEY");
-    throw new Error("CHAVE_INVALIDA");
-  }
-  
+  console.error("Gemini Service Error Detail:", error);
+  // Guidelines: API key handling is external. 
   throw error;
 };
 
@@ -53,7 +36,7 @@ export const generateLegalAnswer = async (
     return response.text || "Sem resposta disponível.";
   } catch (error) {
     await handleAIError(error);
-    return "Erro no processamento da consulta. Verifique a sua ligação ou a validade da chave API.";
+    return "Erro no processamento da consulta. Tente novamente em instantes.";
   }
 };
 
@@ -79,7 +62,6 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
     await handleAIError(error);
-    return null; 
   }
 };
 
@@ -96,7 +78,6 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
      });
      return response.text ? JSON.parse(response.text) : [];
   } catch (error) { 
-    await handleAIError(error);
     return []; 
   }
 };

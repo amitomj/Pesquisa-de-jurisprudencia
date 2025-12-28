@@ -56,13 +56,7 @@ const ProcessingModule: React.FC<Props> = ({
   };
 
   const processFileList = async (files: File[]) => {
-    // Verificação de segurança da chave antes de iniciar o loop pesado
-    if (!process.env.API_KEY || process.env.API_KEY === 'undefined') {
-        alert("A chave de acesso não foi detetada. O processamento em lote requer uma chave configurada. Por favor, utilize o botão 'Chave Ativa' no topo.");
-        setProcessing(false);
-        return;
-    }
-
+    // @google/genai guidelines: API_KEY is assumed to be valid and provided via process.env.API_KEY.
     setLogs(prev => [...prev, `${files.length} ficheiros PDF encontrados. Inicia análise...`]);
 
     const existingFileNames = new Set(existingDB.map(a => a.fileName));
@@ -82,6 +76,9 @@ const ProcessingModule: React.FC<Props> = ({
       try {
         if (i % 5 === 0) setLogs(prev => [...prev, `Progresso (${i + 1}/${newFiles.length}): ${file.name}...`]);
         
+        // Adicionar um pequeno delay para evitar sobrecarregar o canal de comunicação do browser
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         let data = await extractDataFromPdf(file);
 
         const isDataMissing = data.data === 'N/D' || data.relator === 'Desconhecido';
@@ -89,7 +86,7 @@ const ProcessingModule: React.FC<Props> = ({
         const hasDescriptors = data.descritores && data.descritores.length > 0;
 
         if (isDataMissing || isSumarioMissing) {
-            setLogs(prev => [...prev, `⚠️ IA a analisar ${file.name} para recuperar dados...`]);
+            setLogs(prev => [...prev, `⚠️ IA a analisar ${file.name}...`]);
             try {
                 const textLen = data.textoCompleto.length;
                 const context = textLen < 6000 
@@ -98,20 +95,17 @@ const ProcessingModule: React.FC<Props> = ({
 
                 const aiResult = await extractMetadataWithAI(context);
                 
-                if (!aiResult) {
-                    // Se o serviço falhar (ex: erro de chave), paramos o lote imediatamente
-                    setLogs(prev => [...prev, "❌ Processamento interrompido devido a erro na API (Chave ausente ou inválida)."]);
-                    break; 
+                if (aiResult) {
+                    if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
+                    if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
+                    if (aiResult.adjuntos && aiResult.adjuntos.length > 0) data.adjuntos = aiResult.adjuntos;
+                    if (isSumarioMissing && aiResult.sumario && aiResult.sumario.length > 20) data.sumario = aiResult.sumario;
                 }
-
-                if (aiResult.data && aiResult.data !== 'N/D') data.data = aiResult.data;
-                if (aiResult.relator && aiResult.relator !== 'Desconhecido') data.relator = aiResult.relator;
-                if (aiResult.adjuntos && aiResult.adjuntos.length > 0) data.adjuntos = aiResult.adjuntos;
-                if (isSumarioMissing && aiResult.sumario && aiResult.sumario.length > 20) data.sumario = aiResult.sumario;
-            } catch (aiError) {
+            } catch (aiError: any) {
                 console.warn("AI Metadata failed", aiError);
-                // Se o erro for de chave, pára o loop
-                if ((aiError as Error).message?.includes("Chave") || (aiError as Error).message?.includes("API_KEY")) break;
+                if (aiError.message?.includes("ERRO_COMUNICACAO")) {
+                  setLogs(prev => [...prev, `❌ Falha de comunicação com o browser em ${file.name}. Tentando prosseguir...`]);
+                }
             }
         }
 
@@ -236,10 +230,9 @@ const ProcessingModule: React.FC<Props> = ({
                 </button>
                 {rootHandleName && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Pasta vinculada</span>}
               </div>
-              <p className="text-xs text-gray-400 font-medium">Nota: O sistema analisará todos os PDFs na pasta e subpastas. Requer chave de API ativa para correções automáticas.</p>
+              <p className="text-xs text-gray-400 font-medium">Nota: O sistema analisará todos os PDFs na pasta e subpastas.</p>
             </div>
         )}
-        {/* Fix: cast webkitdirectory to any to avoid TypeScript error on standard input element */}
         <input type="file" ref={legacyInputRef} className="hidden" onChange={handleLegacyFileSelect} multiple {...({ webkitdirectory: "" } as any)} />
       </div>
       
