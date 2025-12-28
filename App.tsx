@@ -24,29 +24,33 @@ function App() {
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   
-  // BYOK State
+  // BYOK State - Frontend Only
   const [userApiKey, setUserApiKey] = useState<string>('');
   const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
-  const [showKeyModal, setShowKeyModal] = useState(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
 
-  // Load API Key on Mount
+  // Carrega key do localStorage ao iniciar
   useEffect(() => {
-    const stored = localStorage.getItem('gemini_user_key');
-    if (stored && stored.length > 20) {
-      setUserApiKey(stored);
-      setIsAiConfigured(true);
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('gemini_user_key');
+      if (stored && stored.length > 20) {
+        setUserApiKey(stored);
+        setIsAiConfigured(true);
+      }
     }
   }, []);
 
+  // Botão "Configurar IA" - Frontend Only sem window.aistudio
   const handleSetupKey = () => {
     const key = window.prompt(
-      'Configuração de IA (BYOK):\n\n' +
-      'Cole aqui a sua Gemini API Key.\n' +
-      'Esta chave fica guardada apenas no seu browser e é usada para processar os seus documentos.',
+      'Configuração de IA (Apenas Frontend):\n\n' +
+      'Cole aqui a sua Gemini API Key.\n\n' +
+      '✓ Fica guardada apenas neste browser\n' +
+      '✓ Sem backend, 100% privado e seguro\n' +
+      '✓ Usa a sua própria quota/créditos',
       userApiKey || ''
     );
     
@@ -57,7 +61,7 @@ function App() {
         setIsAiConfigured(false);
         localStorage.removeItem('gemini_user_key');
       } else if (trimmed.length < 20) {
-        alert('Chave inválida. Deve ter aproximadamente 40 caracteres.');
+        alert('Chave inválida (deve ter aproximadamente 40 caracteres).');
       } else {
         setUserApiKey(trimmed);
         setIsAiConfigured(true);
@@ -225,7 +229,7 @@ function App() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}
             >
                 {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConfigured ? 'Sua Chave API Ativa' : 'Configurar IA (BYOK)'}
+                {isAiConfigured ? 'Sua Chave API Ativa' : 'Configurar Chave Gemini'}
             </button>
 
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
@@ -344,7 +348,7 @@ function App() {
             
             <div className="mt-8 pt-6 border-t border-slate-700/50 flex flex-col gap-3">
                  <button onClick={handleSetupKey} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 transition-all">
-                    <Settings className="w-4 h-4"/> Configurar Chave Gemini (BYOK)
+                    <Settings className="w-4 h-4"/> Configurar Chave Gemini (Privado)
                  </button>
             </div>
           </div>
