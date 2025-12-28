@@ -2,14 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-// @google/genai guidelines: Use process.env.API_KEY directly and do not manage keys in UI/localStorage.
 const getAIInstance = () => {
   return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const handleAIError = async (error: any) => {
   console.error("Gemini Service Error Detail:", error);
-  // Guidelines: API key handling is external. 
   throw error;
 };
 
@@ -43,19 +41,25 @@ export const generateLegalAnswer = async (
 export const extractMetadataWithAI = async (textContext: string): Promise<any> => {
   try {
     const ai = getAIInstance();
+    // Prompt mais robusto focado em acórdãos portugueses
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extrai metadados em JSON: data, relator, adjuntos, sumario.\nTEXTO:\n${textContext}`,
+      contents: `Instrução Crítica: Analisa este acórdão e extrai os metadados rigorosamente no formato JSON solicitado. 
+Se o sumário for longo, extrai a versão integral sem resumir excessivamente.
+Se não encontrares um dado, coloca "N/D".
+TEXTO DO ACÓRDÃO:
+${textContext}`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            data: { type: Type.STRING },
-            relator: { type: Type.STRING },
-            adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            sumario: { type: Type.STRING }
-          }
+            data: { type: Type.STRING, description: "Data no formato DD-MM-AAAA" },
+            relator: { type: Type.STRING, description: "Nome do Juiz Relator principal" },
+            adjuntos: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista de Juízes Adjuntos" },
+            sumario: { type: Type.STRING, description: "Texto completo do sumário/conclusões" }
+          },
+          required: ["data", "relator", "adjuntos", "sumario"]
         }
       }
     });
@@ -70,7 +74,7 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
      const ai = getAIInstance();
      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Escolhe os 3 descritores mais adequados da lista fornecida.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
+        contents: `Escolhe os 3 descritores mais adequados da lista fornecida para este sumário jurídico.\nSUMÁRIO: ${summary}\nLISTA DE DESCRITORES VÁLIDOS: ${JSON.stringify(validDescriptors)}`,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }

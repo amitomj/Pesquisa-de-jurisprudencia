@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Acordao, SearchFilters, SearchResult } from '../types';
-import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert } from 'lucide-react';
+import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const parseDate = (dateStr: string): number => {
@@ -89,7 +89,6 @@ interface Props {
   savedSearches: SearchResult[];
   onDeleteSearch: (id: string) => void;
   onUpdateSearchName: (id: string, name: string) => void;
-  // Fix: Removed duplicate onOpenPdf identifier
   onOpenPdf: (fileName: string) => void;
   onGetPdfData: (fileName: string) => Promise<ArrayBuffer | null>;
   onUpdateAcordao: (item: Acordao) => void;
@@ -158,7 +157,6 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const handleBatchAI = async (type: 'sumario' | 'missing') => {
-      // @google/genai guidelines: Remove manual API key checks as it is handled by the environment via process.env.API_KEY.
       const targetList = type === 'sumario' 
           ? results.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('Sumário não identificado'))
           : results.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D' || i.adjuntos.length === 0);
@@ -180,11 +178,14 @@ const SearchModule: React.FC<Props> = ({
           const item = targetList[i];
           setBatchProgress(prev => ({ ...prev, fileName: item.fileName }));
           
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 800));
 
           try {
               const textLen = item.textoCompleto.length;
-              const context = textLen < 6000 ? item.textoCompleto : item.textoCompleto.substring(0, 3000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 3000);
+              // Window maior para capturar sumário e dados de assinatura melhor
+              const context = textLen < 12000 
+                ? item.textoCompleto 
+                : item.textoCompleto.substring(0, 6000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 6000);
               
               const aiResult = await extractMetadataWithAI(context);
               
@@ -193,7 +194,7 @@ const SearchModule: React.FC<Props> = ({
                 if (type === 'missing') {
                     if (aiResult.data && aiResult.data !== 'N/D') updated.data = aiResult.data;
                     if (aiResult.relator && aiResult.relator !== 'Desconhecido') updated.relator = aiResult.relator;
-                    if (aiResult.adjuntos) updated.adjuntos = aiResult.adjuntos;
+                    if (aiResult.adjuntos && aiResult.adjuntos.length > 0) updated.adjuntos = aiResult.adjuntos;
                 } else {
                     if (aiResult.sumario && aiResult.sumario.length > 50) updated.sumario = aiResult.sumario;
                 }
@@ -217,11 +218,13 @@ const SearchModule: React.FC<Props> = ({
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
-      // @google/genai guidelines: Removed manual API key check.
       setIsProcessingSingle(item.id);
       try {
           const textLen = item.textoCompleto.length;
-          const context = textLen < 6000 ? item.textoCompleto : item.textoCompleto.substring(0, 3000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 3000);
+          const context = textLen < 12000 
+            ? item.textoCompleto 
+            : item.textoCompleto.substring(0, 6000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 6000);
+          
           const aiResult = await extractMetadataWithAI(context);
           if (!aiResult) return;
 
@@ -252,6 +255,13 @@ const SearchModule: React.FC<Props> = ({
       onUpdateAcordao(correctionForm);
       setCorrectionMode(null);
     }
+  };
+
+  const handleUpdateAdjunto = (index: number, name: string) => {
+      if (!correctionForm) return;
+      const newAdjuntos = [...correctionForm.adjuntos];
+      newAdjuntos[index] = name;
+      setCorrectionForm({...correctionForm, adjuntos: newAdjuntos.filter(n => n && n !== 'Nenhum')});
   };
 
   const displayedResults = results.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -528,14 +538,48 @@ const SearchModule: React.FC<Props> = ({
                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">Data da Decisão</label>
                             <input type="text" className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-sm font-black focus:ring-2 focus:ring-legal-600 outline-none" value={correctionForm.data} onChange={e => setCorrectionForm({...correctionForm, data: e.target.value})} />
                         </div>
+                        
+                        {/* Seletor de Relator Principal */}
                         <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">Relator Principal</label>
-                            <input type="text" className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-sm font-black focus:ring-2 focus:ring-legal-600 outline-none" value={correctionForm.relator} onChange={e => setCorrectionForm({...correctionForm, relator: e.target.value})} />
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1 flex items-center gap-2">
+                                <UserCheck className="w-3 h-3"/> Juiz Relator
+                            </label>
+                            <select 
+                                className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-sm font-black focus:ring-2 focus:ring-legal-600 outline-none appearance-none cursor-pointer"
+                                value={correctionForm.relator} 
+                                onChange={e => setCorrectionForm({...correctionForm, relator: e.target.value})}
+                            >
+                                <option value="Desconhecido">Escolher Relator...</option>
+                                {availableJudges.map(judge => <option key={judge} value={judge}>{judge}</option>)}
+                            </select>
                         </div>
-                        <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">Colectivo / Adjuntos</label>
-                            <textarea className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-xs font-bold h-24 focus:ring-2 focus:ring-legal-600 outline-none" value={correctionForm.adjuntos.join(', ')} onChange={e => setCorrectionForm({...correctionForm, adjuntos: e.target.value.split(',').map(s=>s.trim())})} />
+
+                        {/* Seletores de Adjuntos */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">1º Adjunto</label>
+                                <select 
+                                    className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none appearance-none cursor-pointer"
+                                    value={correctionForm.adjuntos[0] || 'Nenhum'}
+                                    onChange={e => handleUpdateAdjunto(0, e.target.value)}
+                                >
+                                    <option value="Nenhum">Nenhum</option>
+                                    {availableJudges.map(judge => <option key={judge} value={judge}>{judge}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">2º Adjunto</label>
+                                <select 
+                                    className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none appearance-none cursor-pointer"
+                                    value={correctionForm.adjuntos[1] || 'Nenhum'}
+                                    onChange={e => handleUpdateAdjunto(1, e.target.value)}
+                                >
+                                    <option value="Nenhum">Nenhum</option>
+                                    {availableJudges.map(judge => <option key={judge} value={judge}>{judge}</option>)}
+                                </select>
+                            </div>
                         </div>
+
                         <div className="pt-4 border-t border-gray-200">
                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1">Sumário Jurisprudencial</label>
                             <textarea className="w-full h-[500px] p-6 bg-white border border-gray-300 rounded-3xl shadow-sm font-serif text-lg leading-relaxed focus:ring-2 focus:ring-legal-600 outline-none custom-scrollbar" value={correctionForm.sumario} onChange={e => setCorrectionForm({...correctionForm, sumario: e.target.value})}/>
