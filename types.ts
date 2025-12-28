@@ -17,7 +17,7 @@ export interface SearchFilters {
   processo: string;
   relator: string;
   adjunto: string;
-  descritores: string[]; // Alterado para array
+  descritor: string;
   dataInicio: string;
   dataFim: string;
   booleanAnd: string;

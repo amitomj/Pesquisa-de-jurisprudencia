@@ -1,123 +1,11 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown } from 'lucide-react';
+// Added UserCheck to the imports below to fix the error on line 244
+import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck } from 'lucide-react';
 import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-
-const SearchAutocomplete: React.FC<{
-  items: string[];
-  value: string;
-  onSelect: (val: string) => void;
-  placeholder: string;
-  icon?: React.ReactNode;
-}> = ({ items, value, onSelect, placeholder, icon }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    if (!value) return items.slice(0, 10);
-    return items.filter(i => normalize(i).includes(normalize(value))).slice(0, 20);
-  }, [items, value]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={wrapperRef} className="relative w-full">
-      <div className="relative">
-        <input 
-          placeholder={placeholder} 
-          className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-legal-400" 
-          value={value} 
-          onChange={e => { onSelect(e.target.value); setIsOpen(true); }}
-          onFocus={() => setIsOpen(true)}
-        />
-        {icon && <div className="absolute right-3 top-1/2 -translate-y-1/2 opacity-30">{icon}</div>}
-      </div>
-      {isOpen && filtered.length > 0 && (
-        <div className="absolute z-[120] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
-          {filtered.map((item, idx) => (
-            <button 
-              key={idx} 
-              onClick={() => { onSelect(item); setIsOpen(false); }}
-              className="w-full text-left px-4 py-2 text-[10px] font-black uppercase hover:bg-legal-50 hover:text-legal-900 border-b border-gray-50 last:border-0 transition-colors"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MultiDescriptorSelect: React.FC<{
-  available: string[];
-  selected: string[];
-  onToggle: (tag: string) => void;
-}> = ({ available, selected, onToggle }) => {
-  const [query, setQuery] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const filtered = useMemo(() => {
-    const normQuery = normalize(query);
-    return available.filter(t => normalize(t).includes(normQuery) && !selected.includes(t)).slice(0, 20);
-  }, [available, query, selected]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={wrapperRef} className="space-y-3">
-      <div className="relative">
-        <input 
-          placeholder="Escolher descritores..." 
-          className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-legal-400" 
-          value={query}
-          onChange={e => { setQuery(e.target.value); setIsOpen(true); }}
-          onFocus={() => setIsOpen(true)}
-        />
-        <ChevronDown className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-        
-        {isOpen && filtered.length > 0 && (
-          <div className="absolute z-[120] w-full mt-1 bg-white border border-gray-100 rounded-xl shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
-            {filtered.map((tag, idx) => (
-              <button 
-                key={idx} 
-                onClick={() => { onToggle(tag); setQuery(''); setIsOpen(false); }}
-                className="w-full text-left px-4 py-2 text-[10px] font-black uppercase hover:bg-legal-50 hover:text-legal-900 border-b border-gray-50 last:border-0 transition-colors"
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {selected.map(tag => (
-          <span key={tag} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-legal-900 text-white rounded-lg text-[9px] font-black uppercase shadow-sm">
-            {tag}
-            <button onClick={() => onToggle(tag)} className="hover:text-red-300 transition-colors"><X className="w-3 h-3"/></button>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 const SearchModule: React.FC<{
   db: Acordao[];
@@ -127,7 +15,7 @@ const SearchModule: React.FC<{
   availableJudges: string[];
 }> = ({ db, onOpenPdf, onUpdateAcordao, availableDescriptors, availableJudges }) => {
   const [filters, setFilters] = useState<SearchFilters>({
-    processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
+    processo: '', relator: '', adjunto: '', descritor: '', dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
   });
   const [isProcessing, setIsProcessing] = useState<{id: string | 'batch', mode: string} | null>(null);
 
@@ -137,11 +25,7 @@ const SearchModule: React.FC<{
       if (filters.processo && !normalize(item.processo).includes(normalize(filters.processo))) return false;
       if (filters.relator && !normalize(item.relator).includes(normalize(filters.relator))) return false;
       if (filters.adjunto && !item.adjuntos.some(a => normalize(a).includes(normalize(filters.adjunto)))) return false;
-      
-      // Múltiplos Descritores (Deve conter todos os selecionados - Lógica AND entre tags)
-      if (filters.descritores.length > 0) {
-        if (!filters.descritores.every(d => item.descritores.some(tag => normalize(tag) === normalize(d)))) return false;
-      }
+      if (filters.descritor && !item.descritores.some(d => normalize(d).includes(normalize(filters.descritor)))) return false;
 
       // Datas
       if (filters.dataInicio && item.data !== 'N/D') {
@@ -212,18 +96,8 @@ const SearchModule: React.FC<{
   };
 
   const resetFilters = () => setFilters({
-    processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
+    processo: '', relator: '', adjunto: '', descritor: '', dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
   });
-
-  const toggleDescriptor = (tag: string) => {
-    setFilters(prev => {
-      const isSelected = prev.descritores.includes(tag);
-      return {
-        ...prev,
-        descritores: isSelected ? prev.descritores.filter(t => t !== tag) : [...prev.descritores, tag]
-      };
-    });
-  };
 
   return (
     <div className="flex h-full bg-gray-50 overflow-hidden">
@@ -245,20 +119,8 @@ const SearchModule: React.FC<{
             <div>
               <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Magistrados</label>
               <div className="space-y-2">
-                <SearchAutocomplete 
-                  items={availableJudges} 
-                  value={filters.relator} 
-                  onSelect={val => setFilters({...filters, relator: val})} 
-                  placeholder="Relator..." 
-                  icon={<UserCheck className="w-3.5 h-3.5"/>}
-                />
-                <SearchAutocomplete 
-                  items={availableJudges} 
-                  value={filters.adjunto} 
-                  onSelect={val => setFilters({...filters, adjunto: val})} 
-                  placeholder="Adjunto..." 
-                  icon={<Users className="w-3.5 h-3.5"/>}
-                />
+                <input placeholder="Relator..." className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" value={filters.relator} onChange={e => setFilters({...filters, relator: e.target.value})} />
+                <input placeholder="Adjunto..." className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" value={filters.adjunto} onChange={e => setFilters({...filters, adjunto: e.target.value})} />
               </div>
             </div>
             <div>
@@ -269,12 +131,8 @@ const SearchModule: React.FC<{
               </div>
             </div>
             <div>
-              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Vocabulário Controlado (Seleção)</label>
-              <MultiDescriptorSelect 
-                available={availableDescriptors} 
-                selected={filters.descritores} 
-                onToggle={toggleDescriptor}
-              />
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2">Vocabulário Controlado</label>
+              <input placeholder="Tema/Descritor..." className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" value={filters.descritor} onChange={e => setFilters({...filters, descritor: e.target.value})} />
             </div>
           </div>
 
@@ -307,7 +165,7 @@ const SearchModule: React.FC<{
       {/* Área de Resultados */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Barra de Ações em Massa */}
-        <div className="bg-white p-6 border-b flex items-center justify-between flex-shrink-0">
+        <div className="bg-white p-6 border-b flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <span className="text-[10px] font-black uppercase text-gray-400">Resultados: <span className="text-legal-900">{filteredResults.length}</span></span>
             </div>

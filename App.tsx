@@ -83,7 +83,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
   "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
-  "Desconsideração da personality colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
+  "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
   "Desempregado de longa duração", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
   "Despacho de mero expediente", "Despacho do relator", "Despacho homologatório", "Despacho liminar", "Despacho normativo",
