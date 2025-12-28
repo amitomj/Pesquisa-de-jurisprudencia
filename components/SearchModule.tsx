@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Acordao, SearchFilters, SearchResult } from '../types';
-import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck } from 'lucide-react';
+import { Search, Filter, Eye, FileText, X, Edit2, ChevronLeft, ChevronRight, Wand2, Loader2, AlertCircle, Sparkles, Check, Database, Zap, Users, Info, CircleHelp, OctagonAlert, UserCheck, Tag, Eraser, AlignLeft } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const parseDate = (dateStr: string): number => {
@@ -102,9 +102,11 @@ const ITEMS_PER_PAGE = 20;
 const SearchModule: React.FC<Props> = ({ 
     db, onOpenPdf, onGetPdfData, onUpdateAcordao, availableDescriptors, availableJudges
 }) => {
-  const [filters, setFilters] = useState<SearchFilters>({
+  const initialFilters: SearchFilters = {
     processo: '', relator: '', adjunto: '', descritor: '', dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
-  });
+  };
+
+  const [filters, setFilters] = useState<SearchFilters>(initialFilters);
   const [showMissingSummary, setShowMissingSummary] = useState(false);
   const [showMissingData, setShowMissingData] = useState(false);
 
@@ -114,15 +116,11 @@ const SearchModule: React.FC<Props> = ({
   const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [summaryView, setSummaryView] = useState<Acordao | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [batchProgress, setBatchProgress] = useState<{current: number, total: number, type: string, fileName: string, processedItems: string[], errorCount: number}>({
-    current: 0, total: 0, type: '', fileName: '', processedItems: [], errorCount: 0
-  });
-  const [isBatchRunning, setIsBatchRunning] = useState(false);
   const [isProcessingSingle, setIsProcessingSingle] = useState<string | null>(null);
 
   useEffect(() => {
     handleSearch();
-  }, [db, showMissingSummary, showMissingData]);
+  }, [db, showMissingSummary, showMissingData, filters]);
 
   useEffect(() => {
      if (correctionMode) {
@@ -144,64 +142,27 @@ const SearchModule: React.FC<Props> = ({
       if (filters.processo && !fuzzyMatch(item.processo, filters.processo)) return false;
       if (filters.relator && !fuzzyMatch(item.relator, filters.relator)) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyMatch(a, filters.adjunto))) return false;
-      if (filters.descritor && item.descritores && !item.descritores.some(d => fuzzyMatch(d, filters.descritor))) return false;
+      if (filters.descritor && !item.descritores?.some(d => fuzzyMatch(d, filters.descritor))) return false;
+      
       const itemDate = parseDate(item.data);
       if (filters.dataInicio && itemDate < parseDate(filters.dataInicio)) return false;
       if (filters.dataFim && itemDate > parseDate(filters.dataFim)) return false;
-      const content = (item.sumario + ' ' + item.textoAnalise);
-      if (filters.booleanAnd && !filters.booleanAnd.split(' ').every(t => fuzzyMatch(content, t))) return false;
+      
+      if (filters.booleanAnd) {
+          const content = (item.sumario + ' ' + item.textoAnalise);
+          if (!filters.booleanAnd.split(' ').every(t => fuzzyMatch(content, t))) return false;
+      }
       return true;
     });
     setResults(filtered.sort((a, b) => parseDate(b.data) - parseDate(a.data)));
     setCurrentPage(1);
   };
 
-  const handleBatchAI = async (type: 'sumario' | 'missing') => {
-      const targetList = type === 'sumario' 
-          ? results.filter(i => !i.sumario || i.sumario.length < 50 || i.sumario.includes('Sumário não identificado'))
-          : results.filter(i => i.relator === 'Desconhecido' || i.data === 'N/D' || i.adjuntos.length === 0);
-
-      if (targetList.length === 0) return alert("Nenhum processo filtrado necessita desta correção.");
-      if (!confirm(`Confirmar o processamento por IA de ${targetList.length} processos?`)) return;
-
-      setIsBatchRunning(true);
-      setBatchProgress({ 
-          current: 0, 
-          total: targetList.length, 
-          type: type === 'sumario' ? 'Sumários Integrais' : 'Identidades e Datas',
-          fileName: '',
-          processedItems: [],
-          errorCount: 0
-      });
-      
-      for (let i = 0; i < targetList.length; i++) {
-          const item = targetList[i];
-          setBatchProgress(prev => ({ ...prev, fileName: item.fileName }));
-          await new Promise(resolve => setTimeout(resolve, 800));
-
-          try {
-              const textLen = item.textoCompleto.length;
-              const context = textLen < 15000 
-                ? item.textoCompleto 
-                : item.textoCompleto.substring(0, 8000) + "\n[...]\n" + item.textoCompleto.substring(textLen - 7000);
-              
-              const aiResult = await extractMetadataWithAI(context);
-              if (aiResult) {
-                const updated = { ...item };
-                if (type === 'missing') {
-                    if (aiResult.data && aiResult.data !== 'N/D') updated.data = aiResult.data;
-                    if (aiResult.relator && aiResult.relator !== 'Desconhecido') updated.relator = aiResult.relator;
-                    if (aiResult.adjuntos && aiResult.adjuntos.length > 0) updated.adjuntos = aiResult.adjuntos.filter((a:string) => a !== 'N/D');
-                }
-                if (aiResult.sumario && aiResult.sumario.length > 50) { updated.sumario = aiResult.sumario; }
-                onUpdateAcordao(updated);
-              }
-              setBatchProgress(prev => ({ ...prev, current: i + 1 }));
-          } catch (e: any) { 
-              setBatchProgress(prev => ({ ...prev, errorCount: prev.errorCount + 1 }));
-          }
-      }
-      setIsBatchRunning(false);
+  const handleResetFilters = () => {
+      setFilters(initialFilters);
+      setShowMissingSummary(false);
+      setShowMissingData(false);
+      setCurrentPage(1);
   };
 
   const processSingle = async (item: Acordao, mode: 'full' | 'sumario' | 'dados') => {
@@ -254,6 +215,7 @@ const SearchModule: React.FC<Props> = ({
       setCorrectionForm({...correctionForm, adjuntos: newAdjuntos});
   };
 
+  const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
   const displayedResults = results.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
@@ -266,6 +228,14 @@ const SearchModule: React.FC<Props> = ({
                 <div className="p-1.5 bg-legal-100 rounded-lg"><Filter className="w-4 h-4 text-legal-700"/></div>
                 <h3 className="font-black text-xs text-legal-900 uppercase tracking-widest">Painel de Filtros</h3>
               </div>
+              <button 
+                onClick={handleResetFilters}
+                className="p-2 hover:bg-gray-200 rounded-xl text-gray-400 hover:text-red-600 transition-all flex items-center gap-1.5 group"
+                title="Limpar todos os filtros"
+              >
+                <Eraser className="w-4 h-4" />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden group-hover:inline">Reset</span>
+              </button>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
@@ -296,21 +266,46 @@ const SearchModule: React.FC<Props> = ({
                 </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
                 <div>
-                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1 px-1">N.º do Processo</label>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">N.º do Processo</label>
                     <input type="text" className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none" value={filters.processo} onChange={e => setFilters({...filters, processo: e.target.value})} placeholder="Ex: 810/22..." />
                 </div>
+                
                 <div>
-                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1 px-1">Juiz Relator</label>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">Juiz Relator</label>
                     <input type="text" list="judges-list" className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none" value={filters.relator} onChange={e => setFilters({...filters, relator: e.target.value})} placeholder="Pesquisar relator..." />
+                </div>
+
+                <div>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">Juiz Adjunto</label>
+                    <input type="text" list="judges-list" className="w-full p-2.5 bg-white border border-gray-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none" value={filters.adjunto} onChange={e => setFilters({...filters, adjunto: e.target.value})} placeholder="Pesquisar adjunto..." />
+                </div>
+
+                <div>
+                    <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">Descritor / Tema</label>
+                    <div className="relative">
+                        <Tag className="absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-300" />
+                        <input type="text" className="w-full p-2.5 pr-8 bg-white border border-gray-300 rounded-xl text-xs font-bold focus:ring-2 focus:ring-legal-600 outline-none" value={filters.descritor} onChange={e => setFilters({...filters, descritor: e.target.value})} placeholder="Ex: Acidente, Despedimento..." />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <div>
+                        <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">Desde</label>
+                        <input type="date" className="w-full p-2 bg-white border border-gray-300 rounded-xl text-[10px] font-bold outline-none" value={filters.dataInicio} onChange={e => setFilters({...filters, dataInicio: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest block mb-1.5 px-1">Até</label>
+                        <input type="date" className="w-full p-2 bg-white border border-gray-300 rounded-xl text-[10px] font-bold outline-none" value={filters.dataFim} onChange={e => setFilters({...filters, dataFim: e.target.value})} />
+                    </div>
                 </div>
             </div>
           </div>
 
           <div className="p-4 border-t bg-gray-50">
             <button onClick={handleSearch} className="w-full bg-legal-900 text-white py-3 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all flex items-center justify-center gap-2 active:scale-95">
-              <Search className="w-4 h-4" /> Aplicar Filtros
+              <Search className="w-4 h-4" /> Atualizar Vista
             </button>
           </div>
         </div>
@@ -318,11 +313,12 @@ const SearchModule: React.FC<Props> = ({
 
       {/* Listagem de Resultados */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar pb-28">
             {results.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-gray-300">
                     <div className="p-8 bg-white rounded-full shadow-inner mb-6 opacity-30"><Search className="w-20 h-20" /></div>
-                    <p className="font-black text-sm uppercase tracking-widest">Nenhum acórdão disponível</p>
+                    <p className="font-black text-sm uppercase tracking-widest">Nenhum acórdão encontrado</p>
+                    <button onClick={handleResetFilters} className="mt-4 text-legal-600 font-black text-[10px] uppercase tracking-widest hover:underline">Limpar Filtros</button>
                 </div>
             ) : (
                 displayedResults.map(item => {
@@ -331,8 +327,8 @@ const SearchModule: React.FC<Props> = ({
                   const isProcessing = isProcessingSingle === item.id;
 
                   return (
-                    <div key={item.id} className="bg-white p-5 rounded-[2.5rem] shadow-sm border border-gray-100 hover:border-legal-300 transition-all group relative animate-in fade-in slide-in-from-right-4 duration-500">
-                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+                    <div key={item.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-100 hover:border-legal-300 transition-all group relative animate-in fade-in slide-in-from-right-4 duration-500">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-5">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="bg-legal-900 text-white text-[10px] font-black px-3 py-1.5 rounded-xl tracking-wider">{item.processo}</span>
                           <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{item.data}</span>
@@ -362,7 +358,22 @@ const SearchModule: React.FC<Props> = ({
                            )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+
+                      {/* Texto do Sumário (Preview) */}
+                      <div className="mb-6 relative">
+                          <div className="flex items-start gap-3 mb-2 text-gray-400">
+                             <AlignLeft className="w-3.5 h-3.5 mt-0.5" />
+                             <span className="text-[10px] font-black uppercase tracking-widest">Sumário Jurisprudencial</span>
+                          </div>
+                          <div className="text-gray-700 text-sm font-serif line-clamp-4 leading-relaxed bg-gray-50/50 p-4 rounded-2xl border border-gray-100/50 italic">
+                              {item.sumario || "Sem sumário disponível para exibição automática."}
+                          </div>
+                          {item.sumario && item.sumario.length > 200 && (
+                             <button onClick={() => setSummaryView(item)} className="absolute bottom-2 right-2 text-[9px] font-black uppercase text-legal-600 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full shadow-sm hover:bg-legal-600 hover:text-white transition-all">Ler mais</button>
+                          )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs mb-4">
                         <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
                             <span className="font-black text-[9px] text-gray-400 uppercase block mb-1 tracking-widest">Relator</span>
                             <span className="font-bold text-gray-800 text-sm tracking-tight">{item.relator}</span>
@@ -372,11 +383,44 @@ const SearchModule: React.FC<Props> = ({
                             <span className="text-gray-500 font-bold truncate block">{item.adjuntos.filter(a=>a!=='Nenhum').join(', ') || 'N/D'}</span>
                         </div>
                       </div>
+                      
+                      {item.descritores && item.descritores.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                              {item.descritores.map((tag, idx) => (
+                                  <span key={idx} className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 bg-legal-50 text-legal-600 rounded-md border border-legal-100">{tag}</span>
+                              ))}
+                          </div>
+                      )}
                     </div>
                   );
                 })
             )}
         </div>
+
+        {/* Paginação Elevada */}
+        {results.length > ITEMS_PER_PAGE && (
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-xl border border-gray-200 px-6 py-3 rounded-full shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex items-center gap-8 z-40">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                disabled={currentPage === 1}
+                className="p-2 hover:bg-legal-100 rounded-full disabled:opacity-20 transition-all text-legal-900 active:scale-90"
+              >
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <div className="flex flex-col items-center">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Página</span>
+                  <span className="text-sm font-black text-legal-900">{currentPage} <span className="text-gray-300 px-1">/</span> {totalPages}</span>
+                  <span className="text-[8px] font-black text-legal-500/50 uppercase mt-1">Total: {results.length}</span>
+              </div>
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                disabled={currentPage === totalPages}
+                className="p-2 hover:bg-legal-100 rounded-full disabled:opacity-20 transition-all text-legal-900 active:scale-90"
+              >
+                <ChevronRight className="w-6 h-6" />
+              </button>
+          </div>
+        )}
       </div>
 
       {/* Modal de Revisão / Edição */}
@@ -404,7 +448,6 @@ const SearchModule: React.FC<Props> = ({
                             <input type="text" className="w-full p-4 bg-white border border-gray-300 rounded-2xl shadow-sm text-sm font-black focus:ring-2 focus:ring-legal-600 outline-none" value={correctionForm.data} onChange={e => setCorrectionForm({...correctionForm, data: e.target.value})} />
                         </div>
                         
-                        {/* Seletor de Relator com Dropdown */}
                         <div>
                             <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2 px-1 flex items-center gap-2">
                                 <UserCheck className="w-3 h-3 text-legal-600"/> Juiz Relator
@@ -425,7 +468,6 @@ const SearchModule: React.FC<Props> = ({
                             </div>
                         </div>
 
-                        {/* Seletores de Adjuntos Independentes */}
                         <div className="space-y-4 pt-4 border-t border-gray-200">
                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Juízes Adjuntos</p>
                              <div className="grid grid-cols-1 gap-3">

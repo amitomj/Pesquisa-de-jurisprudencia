@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, Info, Sparkles, ShieldCheck, AlertTriangle, Upload } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -29,33 +29,40 @@ function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Verificação constante da chave de API conforme orientações
   useEffect(() => {
     const checkKey = async () => {
       try {
-        if (window.aistudio) {
+        // @ts-ignore
+        if (window.aistudio && typeof window.aistudio.hasSelectedApiKey === 'function') {
           const has = await window.aistudio.hasSelectedApiKey();
           setHasApiKey(has);
+        } else {
+          // Fallback check se a chave foi injetada mas o aistudio object não está presente em certos contextos
+          setHasApiKey(!!process.env.API_KEY && process.env.API_KEY !== 'undefined');
         }
       } catch (e) {
-        console.error("Erro ao verificar chave:", e);
+        setHasApiKey(false);
       }
     };
     checkKey();
-    const interval = setInterval(checkKey, 3000);
+    const interval = setInterval(checkKey, 2000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSetupKey = async () => {
     try {
-      if (window.aistudio) {
-        console.log("A abrir seletor de chave...");
+      // @ts-ignore
+      if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
         await window.aistudio.openSelectKey();
         setHasApiKey(true);
       } else {
-        alert("O ambiente de execução não suporta a configuração de chave dinâmica. Utilize as variáveis de ambiente.");
+        // Se o seletor não abrir, pode ser que o ambiente não o forneça, 
+        // mas tentamos forçar o check de novo
+        console.log("Tentativa de abertura de chave via sistema...");
       }
     } catch (e) {
-      console.error("Erro ao configurar chave:", e);
+      console.error("Erro ao abrir seletor de chave:", e);
     }
   };
 
@@ -151,7 +158,7 @@ function App() {
         if (parsed.descriptors) setDescriptors(parsed.descriptors);
         setOnboardingStep('app');
       } catch (err) {
-        alert("Erro ao processar o ficheiro de backup.");
+        alert("Erro ao ler ficheiro de backup.");
       }
     };
     reader.readAsText(file);
@@ -186,8 +193,9 @@ function App() {
                   </div>
                 </button>
               ))}
-              <button onClick={() => fileInputRef.current?.click()} className="mt-4 flex items-center justify-center gap-2 text-xs text-blue-400 hover:underline font-bold uppercase tracking-widest">
-                <Upload className="w-3.5 h-3.5"/> Carregar Cópia de Segurança (.json)
+              <div className="h-px bg-slate-700/50 my-2"></div>
+              <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
+                <Upload className="w-4 h-4"/> Carregar Backup (.json)
               </button>
             </div>
         </div>
@@ -221,18 +229,19 @@ function App() {
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${hasApiKey ? 'bg-green-600/20 border border-green-500/50 text-green-400' : 'bg-orange-600 text-white animate-pulse'}`}
             >
               {hasApiKey ? <ShieldCheck className="w-4 h-4"/> : <AlertTriangle className="w-4 h-4"/>}
-              {hasApiKey ? 'Chave Ativa' : 'Configurar Chave API'}
+              {hasApiKey ? 'IA Ativa' : 'Configurar IA'}
             </button>
 
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-1"></div>
             
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 bg-legal-800 text-legal-100 hover:bg-legal-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
-              <Upload className="w-3.5 h-3.5" /> Carregar
-            </button>
-
-            <button onClick={handleSaveDb} className="flex items-center gap-2 px-6 py-2.5 bg-white text-legal-900 hover:bg-legal-100 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
-              <Save className="w-3.5 h-3.5" /> Backup
-            </button>
+            <div className="flex bg-legal-800 rounded-2xl p-1 gap-1">
+              <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 hover:bg-legal-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-legal-100" title="Carregar Backup JSON">
+                <FolderOpen className="w-4 h-4" /> Importar
+              </button>
+              <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-100 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all active:scale-95" title="Exportar Backup JSON">
+                <Save className="w-4 h-4" /> Backup
+              </button>
+            </div>
           </div>
         </div>
       </header>

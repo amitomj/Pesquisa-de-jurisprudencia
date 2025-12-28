@@ -186,7 +186,8 @@ const ProcessingModule: React.FC<Props> = ({
         <input type="file" ref={legacyInputRef} className="hidden" onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             const fileList = e.target.files;
             if (!fileList) return;
-            const files = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.pdf'));
+            // Use type assertion to ensure Array.from returns File[] from FileList to avoid 'unknown' type errors
+            const files = (Array.from(fileList) as File[]).filter(f => f.name.toLowerCase().endsWith('.pdf'));
             if (files.length > 0) { 
               setProcessing(true); 
               onCacheFiles(files); 

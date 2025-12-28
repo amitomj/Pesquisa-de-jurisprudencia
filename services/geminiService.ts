@@ -2,12 +2,13 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
+// Função para obter uma instância fresca do cliente com a chave atualizada
 const getAIInstance = () => {
-  // Conforme as diretrizes, utiliza estritamente process.env.API_KEY
   const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === "undefined") {
     throw new Error("API_KEY_NOT_SET");
   }
+  // Criação de nova instância em cada pedido conforme as diretrizes
   return new GoogleGenAI({ apiKey });
 };
 
@@ -23,25 +24,25 @@ export const generateLegalAnswer = async (
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `Analisa os acórdãos e responde à questão. Se inconclusivo, avisa. Usa citações.
+      contents: `Analisa os acórdãos fornecidos e responde à questão jurídica de forma técnica e fundamentada.
 
-CONTEXTO:
+CONTEXTO JURISPRUDENCIAL:
 ${relevantContext}
 
-QUESTÃO: 
+QUESTÃO DO UTILIZADOR: 
 ${question}`,
       config: {
-        systemInstruction: "És um consultor jurídico especializado em acórdãos portugueses. Resposta técnica e precisa.",
+        systemInstruction: "És um consultor jurídico sénior especializado em Direito Português. Responde de forma técnica, precisa e fundamentada.",
         temperature: 0.1,
         thinkingConfig: { thinkingBudget: 4000 }
       }
     });
 
-    return response.text || "Sem resposta.";
+    return response.text || "Não foi possível gerar uma resposta com base no contexto.";
   } catch (error: any) {
-    if (error.message === "API_KEY_NOT_SET") return "Configure a sua chave de API no botão superior para usar a IA.";
-    console.error("Erro IA:", error);
-    return "Falha na IA. Verifique a sua conexão ou chave.";
+    if (error.message === "API_KEY_NOT_SET") return "Configure a sua chave de API no botão 'Configurar IA' no topo da aplicação.";
+    console.error("Erro na consulta IA:", error);
+    return "Erro no processamento. Verifique a sua ligação e se a chave de API é válida.";
   }
 };
 
@@ -50,12 +51,12 @@ export const extractMetadataWithAI = async (textContext: string): Promise<any> =
     const ai = getAIInstance();
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Extrai os metadados do acórdão em JSON.
+      contents: `Analisa o texto do acórdão e extrai rigorosamente os metadados em JSON.
 REGRAS:
-1. SUMÁRIO: Extrai o texto INTEGRAL. Não resumas.
-2. DATA: DD-MM-AAAA.
-3. MAGISTRADOS: Relator e Adjuntos completos.
-4. "N/D" se em falta.
+1. SUMÁRIO: Extrai o texto INTEGRAL e COMPLETO do sumário. Não resumas.
+2. DATA: Identifica a data da decisão (DD-MM-AAAA).
+3. MAGISTRADOS: Identifica o Juiz Relator e os Juízes Adjuntos.
+4. Se um campo não for encontrado, usa "N/D".
 
 TEXTO:
 ${textContext}`,
@@ -75,6 +76,7 @@ ${textContext}`,
     });
     return response.text ? JSON.parse(response.text) : null;
   } catch (error) { 
+    console.error("Erro na extração IA:", error);
     return null;
   }
 };
@@ -84,7 +86,7 @@ export const suggestDescriptorsWithAI = async (summary: string, validDescriptors
      const ai = getAIInstance();
      const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
-        contents: `Escolha os 3 descritores mais relevantes.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
+        contents: `Escolha os 3 descritores mais relevantes da lista para este sumário jurídico.\nSUMÁRIO: ${summary}\nLISTA: ${JSON.stringify(validDescriptors)}`,
         config: {
             responseMimeType: "application/json",
             responseSchema: { type: Type.ARRAY, items: { type: Type.STRING } }
