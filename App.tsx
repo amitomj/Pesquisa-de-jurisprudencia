@@ -32,7 +32,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Aplicação de contrato colectivo de trabalho", "Aplicação de lei estrangeira", "Aplicação do direito",
   "Aplicação subsidiária do Código de Processo Civil", "Apoio judiciário", "Apólice uniforme", "Arbitragem",
   "Arguição de nulidades", "Articulado motivador", "Articulado superveniente", "Ascendente", "Assédio", "Assédio horizontal",
-  "Assistente", "Assembleia de credores", "Assessor técnico", "Assistência a menores", "Assistência a pessoas com deficiência",
+  "Assistente", "Assembleia de credores", "Assessor técnico", "Assistência a menores", "Assistência a pessoas com distivéis",
   "Assistência de terceira pessoa", "Assistência hospitalar", "Associações de empregadores", "Associações sindicais",
   "Assunção de dívida", "Atenuação especial da coima", "Audição do arguido", "Audiência de partes", "Audiência prévia",
   "Autarquia local", "Auto de advertência", "Auto de não conciliação", "Auto de notícia", "Autonomia administrativa",
@@ -82,7 +82,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Declarações de parte", "Dedução de rendimentos auferidos após o despedimento", "Deficiência da gravação",
   "Delegação de poderes", "Delegado sindical", "Deliberação da Assembleia-Geral", "Deliberação social", "Denúncia do contrato de trabalho",
   "Dependência económica", "Depoimento de parte", "Depósito bancário", "Descanso compensatório", "Descanso diário",
-  "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Descaracterização de acidente de trabalho",
+  "Descanso semanal", "Descanso semanal complementar", "Descanso semanal obrigatório", "Desccaracterização de acidente de trabalho",
   "Desconsideração da personalidade colectiva", "Descontos na retribuição", "Descontos para a Segurança Social",
   "Desprezo pelas regras de segurança", "Deserção do recurso", "Desfiliação", "Deslocação em serviço", "Desmembramento de empresa",
   "Desobediência", "Despachante oficial", "Despacho", "Despacho de aperfeiçoamento", "Despacho de arquivamento do inquérito",
@@ -262,7 +262,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   const [rootHandleName, setRootHandleName] = useState<string | null>(null);
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
-  const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -436,7 +435,6 @@ function App() {
           <div className="flex gap-2">
             <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
             
-            {/* Secção de Chats */}
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
                 <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Histórico de Chat">
                     <History className="w-4 h-4" />
@@ -446,7 +444,6 @@ function App() {
                 </button>
             </div>
 
-            {/* Secção Legal */}
             <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
                 <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Acórdãos/Backup Geral">
                     <Upload className="w-4 h-4" />
@@ -474,7 +471,7 @@ function App() {
                 existingDB={db} 
                 onSetRootHandle={handleSetRoot} 
                 rootHandleName={rootHandleName} 
-                onCacheFiles={setCachedFiles} 
+                onCacheFiles={() => {}} 
                 onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
                 onAddJudges={setJudges} 
                 onMergeJudges={handleMergeJudges}
