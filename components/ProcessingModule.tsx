@@ -239,7 +239,8 @@ const ProcessingModule: React.FC<Props> = ({
               <p className="text-xs text-gray-400 font-medium">Nota: O sistema analisará todos os PDFs na pasta e subpastas. Requer chave de API ativa para correções automáticas.</p>
             </div>
         )}
-        <input type="file" ref={legacyInputRef} className="hidden" onChange={handleLegacyFileSelect} multiple webkitdirectory="" />
+        {/* Fix: cast webkitdirectory to any to avoid TypeScript error on standard input element */}
+        <input type="file" ref={legacyInputRef} className="hidden" onChange={handleLegacyFileSelect} multiple {...({ webkitdirectory: "" } as any)} />
       </div>
       
       {logs.length > 0 && (

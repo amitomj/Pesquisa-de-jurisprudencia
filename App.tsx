@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ArrowRight, RotateCcw, Info, Sparkles, ExternalLink } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, ArrowRight, RotateCcw, Info, Sparkles, ExternalLink, Eye, EyeOff, LogOut } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -24,45 +24,47 @@ function App() {
   const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [cachedFiles, setCachedFiles] = useState<File[]>([]);
   
-  // Estado de Onboarding: 'welcome' -> 'area' -> 'app'
+  // Estado da Chave API
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  
+  // Onboarding Step
   const [onboardingStep, setOnboardingStep] = useState<'welcome' | 'area' | 'app'>('welcome');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Verifica se já existe chave ao carregar
+  // Inicialização: Verifica se já existe chave guardada
   useEffect(() => {
-    const checkExistingKey = async () => {
-      if (window.aistudio?.hasSelectedApiKey) {
-        try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
-          if (hasKey) setOnboardingStep('area');
-        } catch (e) {}
-      }
-    };
-    checkExistingKey();
+    const localKey = localStorage.getItem("GEMINI_API_KEY");
+    if (localKey && localKey.length > 10) {
+      setApiKeyInput(localKey);
+      setOnboardingStep('area');
+    } else if (process.env.API_KEY && process.env.API_KEY !== 'undefined') {
+      // Se houver chave do sistema, também podemos avançar
+      setOnboardingStep('area');
+    }
   }, []);
 
-  const handleStartSetup = async () => {
-    if (window.aistudio?.openSelectKey) {
-      // Abre o diálogo do sistema (janela nativa da plataforma onde o utilizador cola a chave)
-      await window.aistudio.openSelectKey();
-      // Assume sucesso para avançar o ecrã
+  const handleSaveKeyAndEnter = () => {
+    if (apiKeyInput.trim().length > 10) {
+      localStorage.setItem("GEMINI_API_KEY", apiKeyInput.trim());
       setOnboardingStep('area');
     } else {
-      // Fallback para ambientes sem aistudio SDK
-      setOnboardingStep('area');
+      alert("Por favor, introduza uma chave válida.");
+    }
+  };
+
+  const handleLogoutKey = () => {
+    if (confirm("Deseja remover a chave API e sair?")) {
+      localStorage.removeItem("GEMINI_API_KEY");
+      setApiKeyInput('');
+      setOnboardingStep('welcome');
     }
   };
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
-  };
-
-  const handleUpdateKeyInApp = async () => {
-    if (window.aistudio?.openSelectKey) {
-      await window.aistudio.openSelectKey();
-    }
   };
 
   // --- Lógica de Base de Dados ---
@@ -160,52 +162,58 @@ function App() {
   if (onboardingStep !== 'app') {
     return (
       <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-        <div className="bg-[#1e293b] rounded-[24px] shadow-2xl p-10 max-w-[500px] w-full text-center animate-in zoom-in-95 duration-500 border border-slate-700">
+        <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center animate-in zoom-in-95 duration-500 border border-slate-700/50">
           
           {onboardingStep === 'welcome' ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="mb-8 flex justify-center">
-                <div className="w-16 h-16 bg-[#1e293b] rounded-full flex items-center justify-center border border-slate-700 shadow-xl">
-                  <div className="w-12 h-12 bg-blue-900/40 rounded-full flex items-center justify-center">
-                    <Key className="w-6 h-6 text-blue-500" />
+              <div className="mb-10 flex justify-center">
+                <div className="w-20 h-20 bg-[#1e293b] rounded-full flex items-center justify-center border border-slate-700 shadow-2xl relative">
+                  <div className="w-14 h-14 bg-blue-900/30 rounded-full flex items-center justify-center">
+                    <Key className="w-8 h-8 text-blue-500" />
                   </div>
+                  <div className="absolute -right-2 -top-2 bg-blue-600 w-6 h-6 rounded-full border-4 border-[#1e293b] animate-pulse"></div>
                 </div>
               </div>
               
-              <h2 className="text-2xl font-bold mb-4 tracking-tight text-white">Configuração da API</h2>
-              <p className="text-slate-400 mb-10 text-sm leading-relaxed">
-                Para utilizar a Inteligência Artificial, é necessário uma chave da Google Gemini API.
+              <h2 className="text-3xl font-black mb-4 tracking-tighter text-white uppercase">Configuração da API</h2>
+              <p className="text-slate-400 mb-10 text-sm leading-relaxed px-4">
+                Para utilizar a Inteligência Artificial, é necessário introduzir a sua chave da Google Gemini API.
               </p>
               
               <div className="text-left mb-8">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2 px-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] block mb-3 px-1">
                   CHAVE API (GOOGLE GEMINI)
                 </label>
-                <button 
-                  onClick={handleStartSetup}
-                  className="w-full bg-[#334155]/50 border border-slate-600 rounded-lg p-3.5 text-slate-400 text-sm text-left italic shadow-inner hover:bg-[#334155]/80 transition-all cursor-pointer flex items-center justify-between group"
-                >
-                  <span>Ex: AlzaSy...</span>
-                  <Key className="w-4 h-4 text-slate-600 group-hover:text-blue-500 transition-colors" />
-                </button>
-                <p className="text-[10px] text-slate-500 mt-2 px-1">
-                  * Clique acima para inserir a chave na janela segura do sistema.
-                </p>
+                <div className="relative group">
+                  <input 
+                    type={showKey ? "text" : "password"}
+                    className="w-full bg-[#0f172a] border-2 border-slate-700 rounded-2xl p-4 pr-14 text-white text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-inner placeholder:text-slate-700 font-mono"
+                    placeholder="Cole a sua chave aqui (ex: Alza...)"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                  />
+                  <button 
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                  >
+                    {showKey ? <EyeOff className="w-5 h-5"/> : <Eye className="w-5 h-5"/>}
+                  </button>
+                </div>
               </div>
 
               <button 
-                onClick={handleStartSetup} 
-                className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-3 hover:bg-blue-500 shadow-lg shadow-blue-900/20 transition-all active:scale-95 mb-8"
+                onClick={handleSaveKeyAndEnter} 
+                className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:bg-blue-500 shadow-xl shadow-blue-900/20 transition-all active:scale-95 mb-8"
               >
                 Entrar
               </button>
 
-              <div className="pt-6 border-t border-slate-700 space-y-4">
+              <div className="pt-8 border-t border-slate-700/50 space-y-4">
                 <a 
-                  href="https://ai.google.dev/gemini-api/docs/billing" 
+                  href="https://aistudio.google.com/app/apikey" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+                  className="inline-flex items-center gap-2 text-sm font-bold text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" />
                   Obter chave gratuita no Google AI Studio
@@ -216,37 +224,43 @@ function App() {
               </div>
               
               <div className="mt-8">
-                <button onClick={() => fileInputRef.current?.click()} className="text-[10px] font-bold uppercase tracking-widest text-slate-600 hover:text-slate-400 transition-all">
+                <button onClick={() => fileInputRef.current?.click()} className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 hover:text-slate-400 transition-all border-b border-transparent hover:border-slate-400">
                   OU IMPORTAR BACKUP ANTERIOR
                 </button>
               </div>
             </div>
           ) : (
             <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              <div className="mb-8 flex justify-center">
-                <div className="p-6 bg-blue-600/10 rounded-full border border-blue-600/20">
+              <div className="mb-10 flex justify-center">
+                <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20 shadow-inner">
                   <Sparkles className="w-12 h-12 text-blue-500"/>
                 </div>
               </div>
-              <h2 className="text-2xl font-bold mb-2 tracking-tight text-white uppercase">Área Jurídica</h2>
-              <p className="text-slate-400 mb-10 text-sm italic">Selecione a jurisdição para carregar os descritores adequados.</p>
+              <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">Área Jurídica</h2>
+              <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição para carregar os descritores adequados.</p>
               
               <div className="grid grid-cols-1 gap-4">
                 {['social', 'crime', 'civil'].map((area: any) => (
                   <button 
                     key={area} 
                     onClick={() => selectLegalArea(area)} 
-                    className="group p-5 rounded-2xl border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-5 text-left active:scale-95"
+                    className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
                   >
-                    <div className="p-3 bg-slate-700 rounded-xl border border-slate-600 group-hover:border-blue-900 transition-all shadow-sm">
-                      {area === 'social' ? <Briefcase className="w-7 h-7 text-blue-400"/> : area === 'crime' ? <Gavel className="w-7 h-7 text-blue-400"/> : <ScaleIcon className="w-7 h-7 text-blue-400"/>}
+                    <div className="p-4 bg-slate-700 rounded-2xl border border-slate-600 group-hover:border-blue-900 transition-all shadow-xl group-hover:bg-blue-900/20">
+                      {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
                     </div>
                     <div>
-                        <div className="capitalize font-bold text-lg text-white tracking-tight">Área {area}</div>
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">Aceder ao Painel</div>
+                        <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Aceder ao Painel</div>
                     </div>
                   </button>
                 ))}
+              </div>
+              
+              <div className="mt-10 pt-6 border-t border-slate-700/50 flex justify-center">
+                 <button onClick={() => setOnboardingStep('welcome')} className="text-[10px] font-black uppercase tracking-widest text-slate-600 hover:text-white flex items-center gap-2 transition-all">
+                    <RotateCcw className="w-3 h-3"/> Mudar Chave API
+                 </button>
               </div>
             </div>
           )}
@@ -266,7 +280,7 @@ function App() {
                 <ScaleIcon className="w-8 h-8 text-legal-100" />
             </div>
             <div>
-              <h1 className="text-2xl font-black tracking-tighter leading-none">JurisAnalítica</h1>
+              <h1 className="text-2xl font-black tracking-tighter leading-none uppercase">JurisAnalítica</h1>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[10px] text-legal-300 uppercase tracking-[0.2em] font-black">Sessão: {legalArea}</p>
                 <button onClick={() => setOnboardingStep('area')} className="text-[9px] bg-legal-700 hover:bg-legal-600 px-2 py-0.5 rounded uppercase font-black tracking-widest flex items-center gap-1 transition-all">
@@ -277,15 +291,20 @@ function App() {
           </div>
           
           <div className="flex items-center gap-4">
-            <button 
-              onClick={handleUpdateKeyInApp}
-              className="flex items-center gap-2 px-4 py-2 bg-green-900/30 border border-green-500/30 rounded-full hover:bg-green-800/40 transition-all group"
-            >
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse group-hover:scale-125 transition-transform"></div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Chave Ativa</span>
-            </button>
+            <div className="flex flex-col items-end mr-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-900/30 border border-green-500/30 rounded-full group">
+                    <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-green-400">IA Conetada</span>
+                </div>
+                <span className="text-[8px] text-legal-400 uppercase tracking-widest mt-1 mr-1">
+                    {localStorage.getItem("GEMINI_API_KEY") ? 'Chave Manual' : 'Chave Sistema'}
+                </span>
+            </div>
             <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
-            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all">Importar</button>
+            <button onClick={handleLogoutKey} className="p-3 text-legal-400 hover:text-white hover:bg-red-900/40 rounded-xl transition-all" title="Sair / Remover Chave">
+                <LogOut className="w-5 h-5" />
+            </button>
+            <button onClick={() => fileInputRef.current?.click()} className="text-[11px] font-black uppercase tracking-widest text-legal-300 hover:text-white transition-all px-2">Importar</button>
             <button onClick={handleSaveDb} className="flex items-center gap-2.5 px-6 py-3 bg-white text-legal-900 hover:bg-legal-100 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
               <Save className="w-4 h-4" /> Exportar Backup
             </button>
