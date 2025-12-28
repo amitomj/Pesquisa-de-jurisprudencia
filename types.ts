@@ -11,6 +11,11 @@ export interface Acordao {
   textoCompleto: string;
   fileName: string;
   tipoDecisao: 'Acórdão' | 'Decisão Sumária';
+  // Segmentação Estrutural
+  relatorio: string;
+  factosProvados: string;
+  factosNaoProvados: string;
+  fundamentacaoDireito: string;
 }
 
 export interface SearchFilters {
