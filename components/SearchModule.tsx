@@ -1,23 +1,19 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info, RefreshCw, AlertCircle } from 'lucide-react';
+import { Search, FileText, Loader2, Tag, AlignLeft, Sparkles, Trash2, Calendar, Users, Filter, X, ChevronRight, Activity, UserCheck, ChevronDown, Eye, Play, StopCircle, Info, RefreshCw, AlertCircle, Edit2, Check, Save } from 'lucide-react';
 import { extractMetadataWithAI, suggestDescriptorsWithAI } from '../services/geminiService';
 
-/**
- * Função de normalização difusa (Advanced Fuzzy)
- * Ignora: acentos, espaços, caracteres especiais, grafias duplicadas e variações clássicas (ct/t, cc/c)
- */
 const fuzzyNormalize = (str: string) => {
   if (!str) return "";
   return str
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // Remove acentos
+    .replace(/[\u0300-\u036f]/g, "") 
     .toLowerCase()
-    .replace(/[\s\-\.\/]/g, "") // Remove espaços e separadores
-    .replace(/ct/g, "t") // factura -> fatura
-    .replace(/cc/g, "c") // acção -> ação
-    .replace(/(.)\1+/g, "$1") // Remove letras repetidas: ffaatturra -> fatura
+    .replace(/[\s\-\.\/]/g, "") 
+    .replace(/ct/g, "t") 
+    .replace(/cc/g, "c") 
+    .replace(/(.)\1+/g, "$1") 
     .trim();
 };
 
@@ -150,10 +146,10 @@ const SearchModule: React.FC<{
   const [batchMode, setBatchMode] = useState<'sumario' | 'tags' | 'dados' | 'revisao' | null>(null);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
   const [viewingSummary, setViewingSummary] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<Acordao | null>(null);
 
   const filteredResults = useMemo(() => {
     return db.filter(item => {
-      // Filtros Básicos
       if (filters.processo && !fuzzyNormalize(item.processo).includes(fuzzyNormalize(filters.processo))) return false;
       if (filters.relator && !fuzzyNormalize(item.relator).includes(fuzzyNormalize(filters.relator))) return false;
       if (filters.adjunto && !item.adjuntos.some(a => fuzzyNormalize(a).includes(fuzzyNormalize(filters.adjunto)))) return false;
@@ -162,7 +158,6 @@ const SearchModule: React.FC<{
         if (!filters.descritores.every(d => item.descritores.some(tag => fuzzyNormalize(tag) === fuzzyNormalize(d)))) return false;
       }
 
-      // Datas
       if (filters.dataInicio && item.data !== 'N/D') {
         const parts = item.data.split('-');
         if (parts.length === 3) {
@@ -180,7 +175,6 @@ const SearchModule: React.FC<{
         }
       }
 
-      // Lógica Booleana Difusa
       const fullTextFuzzy = fuzzyNormalize(item.sumario + " " + item.textoAnalise + " " + item.processo);
       
       if (filters.booleanAnd) {
@@ -202,10 +196,9 @@ const SearchModule: React.FC<{
     });
   }, [db, filters]);
 
-  // Identificar documentos que realmente precisam de tratamento
   const itemsNeedingProcessing = useMemo(() => {
     if (!batchMode) return [];
-    if (batchMode === 'revisao') return filteredResults; // Revisão global ignora se está em falta
+    if (batchMode === 'revisao') return filteredResults; 
     
     return filteredResults.filter(item => {
       if (batchMode === 'sumario') return !item.sumario || item.sumario.includes('não identificado');
@@ -214,6 +207,11 @@ const SearchModule: React.FC<{
       return false;
     });
   }, [filteredResults, batchMode]);
+
+  const resultsToDisplay = useMemo(() => {
+    if (batchMode) return itemsNeedingProcessing;
+    return filteredResults;
+  }, [filteredResults, itemsNeedingProcessing, batchMode]);
 
   const runIA = async (item: Acordao, mode: string) => {
     setIsProcessing({ id: item.id, mode });
@@ -242,16 +240,16 @@ const SearchModule: React.FC<{
 
   const startBatchIA = async () => {
     if (!batchMode || itemsNeedingProcessing.length === 0) return;
-    
     setIsProcessing({ id: 'batch', mode: batchMode });
     setBatchProgress({ current: 0, total: itemsNeedingProcessing.length });
     
     let count = 0;
+    const total = itemsNeedingProcessing.length;
     for (const item of itemsNeedingProcessing) {
       if (isProcessing?.id !== 'batch' && count > 0) break; 
       await runIA(item, batchMode);
       count++;
-      setBatchProgress(p => ({ ...p, current: count }));
+      setBatchProgress({ current: count, total: total });
     }
     
     setIsProcessing(null);
@@ -260,7 +258,6 @@ const SearchModule: React.FC<{
   };
 
   const handleSelectBatchMode = (mode: 'sumario' | 'tags' | 'dados' | 'revisao') => {
-    // Verificar se há algo para tratar antes de mudar o estado visual
     const count = filteredResults.filter(item => {
       if (mode === 'sumario') return !item.sumario || item.sumario.includes('não identificado');
       if (mode === 'tags') return item.descritores.length === 0;
@@ -276,9 +273,12 @@ const SearchModule: React.FC<{
     setBatchMode(mode);
   };
 
-  const resetFilters = () => setFilters({
-    processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
-  });
+  const resetFilters = () => {
+    setFilters({
+      processo: '', relator: '', adjunto: '', descritores: [], dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
+    });
+    setBatchMode(null);
+  };
 
   const toggleDescriptor = (tag: string) => {
     setFilters(prev => {
@@ -292,6 +292,67 @@ const SearchModule: React.FC<{
 
   return (
     <div className="flex h-full bg-gray-50 overflow-hidden relative">
+      {/* Modal de Edição */}
+      {editingItem && (
+          <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-8 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white max-w-4xl w-full rounded-[3rem] shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+                  <div className="p-8 border-b flex justify-between items-center bg-gray-50">
+                      <div>
+                        <h3 className="text-xl font-black uppercase tracking-tighter text-legal-900">Editar Documento</h3>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{editingItem.fileName}</p>
+                      </div>
+                      <button onClick={() => setEditingItem(null)} className="p-3 hover:bg-white rounded-full transition-all text-gray-400 hover:text-red-600 shadow-sm"><X className="w-6 h-6"/></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Nº Processo</label>
+                              <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold" value={editingItem.processo} onChange={e => setEditingItem({...editingItem, processo: e.target.value})} />
+                          </div>
+                          <div>
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Data</label>
+                              <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold" value={editingItem.data} onChange={e => setEditingItem({...editingItem, data: e.target.value})} />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-6">
+                          <div>
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Relator</label>
+                              <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold" value={editingItem.relator} onChange={e => setEditingItem({...editingItem, relator: e.target.value})} />
+                          </div>
+                          <div>
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Adjuntos (separados por vírgula)</label>
+                              <input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold" value={editingItem.adjuntos.join(', ')} onChange={e => setEditingItem({...editingItem, adjuntos: e.target.value.split(',').map(s => s.trim())})} />
+                          </div>
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Descritores</label>
+                          <MultiDescriptorSelect 
+                            available={availableDescriptors} 
+                            selected={editingItem.descritores} 
+                            onToggle={(tag) => {
+                                const isSelected = editingItem.descritores.includes(tag);
+                                setEditingItem({
+                                    ...editingItem,
+                                    descritores: isSelected ? editingItem.descritores.filter(t => t !== tag) : [...editingItem.descritores, tag]
+                                });
+                            }} 
+                          />
+                      </div>
+                      <div>
+                          <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Sumário</label>
+                          <textarea className="w-full p-6 bg-gray-50 border border-gray-100 rounded-3xl text-sm font-serif italic leading-relaxed min-h-[300px]" value={editingItem.sumario} onChange={e => setEditingItem({...editingItem, sumario: e.target.value})} />
+                      </div>
+                  </div>
+                  <div className="p-8 border-t bg-gray-50 flex justify-end gap-4">
+                      <button onClick={() => setEditingItem(null)} className="px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:bg-gray-100 transition-all">Cancelar</button>
+                      <button onClick={() => { onUpdateAcordao(editingItem); setEditingItem(null); }} className="bg-legal-900 text-white px-10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl flex items-center gap-2 hover:bg-black transition-all">
+                          <Save className="w-4 h-4" /> Guardar Alterações
+                      </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Modal de Sumário */}
       {viewingSummary && (
           <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-8 backdrop-blur-sm animate-in fade-in">
@@ -315,7 +376,6 @@ const SearchModule: React.FC<{
           </div>
       )}
 
-      {/* Sidebar de Filtros */}
       <div className="w-80 bg-white border-r flex flex-col shadow-sm">
         <div className="p-6 border-b flex justify-between items-center">
             <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-legal-900 flex items-center gap-2">
@@ -389,22 +449,20 @@ const SearchModule: React.FC<{
         </div>
       </div>
 
-      {/* Área de Resultados */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Barra de Ações em Massa */}
         <div className="bg-white p-6 border-b flex items-center justify-between flex-shrink-0 z-10 shadow-sm">
             <div className="flex items-center gap-4">
-                <span className="text-[10px] font-black uppercase text-gray-400">Encontrados: <span className="text-legal-900 bg-gray-100 px-3 py-1 rounded-full">{filteredResults.length}</span></span>
+                <span className="text-[10px] font-black uppercase text-gray-400">Resultados: <span className="text-legal-900 bg-gray-100 px-3 py-1 rounded-full">{resultsToDisplay.length}</span></span>
             </div>
             
             {isProcessing?.id === 'batch' ? (
-                <div className="flex-1 max-w-md mx-8">
+                <div className="flex-1 max-w-md mx-8 animate-in fade-in">
                     <div className="flex justify-between items-end mb-2">
                         <div className="flex items-center gap-2">
                             <Loader2 className="w-3 h-3 animate-spin text-legal-600" />
-                            <span className="text-[9px] font-black uppercase text-legal-600 tracking-widest">Tratando {isProcessing.mode}...</span>
+                            <span className="text-[9px] font-black uppercase text-legal-600 tracking-widest">A tratar {isProcessing.mode}...</span>
                         </div>
-                        <span className="text-[10px] font-black text-legal-900">{batchProgress.total - batchProgress.current} restantes</span>
+                        <span className="text-[10px] font-black text-legal-900">Documentos restantes: {batchProgress.total - batchProgress.current}</span>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-200">
                         <div 
@@ -418,7 +476,7 @@ const SearchModule: React.FC<{
                     <div className="bg-orange-50 border border-orange-100 px-4 py-2 rounded-xl flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-orange-600"/>
                         <span className="text-[10px] font-black uppercase text-orange-800">
-                            {batchMode === 'revisao' ? `Revisar todos os ${filteredResults.length} sumários` : `${itemsNeedingProcessing.length} documentos com falhas em ${batchMode}`}
+                            {batchMode === 'revisao' ? `Revisar todos os ${filteredResults.length} sumários` : `${itemsNeedingProcessing.length} pendentes em ${batchMode}`}
                         </span>
                     </div>
                     <button 
@@ -466,8 +524,8 @@ const SearchModule: React.FC<{
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-          {filteredResults.length > 0 ? filteredResults.map(item => (
-            <div key={item.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden">
+          {resultsToDisplay.length > 0 ? resultsToDisplay.map(item => (
+            <div key={item.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden animate-in fade-in slide-in-from-bottom-4">
               <div className="p-8">
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex items-center gap-3">
@@ -480,10 +538,13 @@ const SearchModule: React.FC<{
                     <button onClick={() => setViewingSummary(item.id)} title="Ver Sumário Completo" className="p-3 bg-gray-50 text-legal-700 rounded-2xl hover:bg-legal-100 transition-all border border-gray-100">
                         <Eye className="w-4 h-4"/>
                     </button>
-                    <button onClick={() => runIA(item, 'sumario')} title="IA: Extrair Sumário" className="p-3 bg-orange-50 text-orange-600 rounded-2xl hover:bg-orange-600 hover:text-white transition-all">
+                    <button onClick={() => setEditingItem(item)} title="Editar Manualmente" className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all border border-blue-100">
+                        <Edit2 className="w-4 h-4"/>
+                    </button>
+                    <button onClick={() => runIA(item, 'sumario')} title="IA: Extrair Sumário (Refazer)" className="p-3 bg-orange-50 text-orange-600 rounded-2xl hover:bg-orange-600 hover:text-white transition-all border border-orange-100">
                         {isProcessing?.id === item.id && isProcessing.mode === 'sumario' ? <Loader2 className="w-4 h-4 animate-spin"/> : <AlignLeft className="w-4 h-4"/>}
                     </button>
-                    <button onClick={() => runIA(item, 'tags')} title="IA: Sugerir Tags" className="p-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-600 hover:text-white transition-all">
+                    <button onClick={() => runIA(item, 'tags')} title="IA: Sugerir Tags (Refazer)" className="p-3 bg-purple-50 text-purple-600 rounded-2xl hover:bg-purple-600 hover:text-white transition-all border border-purple-100">
                         {isProcessing?.id === item.id && isProcessing.mode === 'tags' ? <Loader2 className="w-4 h-4 animate-spin"/> : <Tag className="w-4 h-4"/>}
                     </button>
                     <button onClick={() => onOpenPdf(item.fileName)} title="Abrir Documento Original" className="p-3 bg-legal-900 text-white rounded-2xl shadow-xl hover:bg-black transition-all">

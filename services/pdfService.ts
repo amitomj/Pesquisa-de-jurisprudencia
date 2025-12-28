@@ -11,22 +11,20 @@ const cleanRunningText = (fullText: string): string => {
   return cleaned.trim();
 };
 
-/**
- * Tenta extrair o sumário baseando-se em marcadores específicos
- * Procura nas primeiras 2 páginas e últimas 4 páginas.
- */
 const extractTargetedSummary = (pages: string[]): string => {
   const numPages = pages.length;
-  // Focar nas primeiras 2 e últimas 4
-  const targetPages = [];
-  for (let i = 0; i < Math.min(2, numPages); i++) targetPages.push(pages[i]);
-  for (let i = Math.max(0, numPages - 4); i < numPages; i++) {
-    if (!targetPages.includes(pages[i])) targetPages.push(pages[i]);
-  }
+  const targetPagesIdx = new Set<number>();
+  
+  // Primeiras 2 páginas
+  for (let i = 0; i < Math.min(2, numPages); i++) targetPagesIdx.add(i);
+  // Últimas 4 páginas
+  for (let i = Math.max(0, numPages - 4); i < numPages; i++) targetPagesIdx.add(i);
 
-  const combinedText = targetPages.join('\n');
+  const combinedText = Array.from(targetPagesIdx)
+    .sort((a, b) => a - b)
+    .map(idx => pages[idx])
+    .join('\n');
 
-  // Marcadores fornecidos pelo utilizador + variações comuns
   const sumarioMarkers = [
     /sumário:?/i,
     /Sumário/i,
@@ -39,11 +37,11 @@ const extractTargetedSummary = (pages: string[]): string => {
   for (const marker of sumarioMarkers) {
     const match = combinedText.match(marker);
     if (match && match.index !== undefined) {
-      // Extrai até encontrar um marcador de fim de secção ou o fim do bloco
       const start = match.index + match[0].length;
       const sub = combinedText.substring(start);
-      const endMatch = sub.match(/\n\s*(DECISÃO|ACORDAM|RELATÓRIO|FUNDAMENTAÇÃO|I\.|1\.)/i);
-      const end = endMatch ? endMatch.index : 3000; // Limite de segurança
+      // Pára ao encontrar o início de uma nova secção importante
+      const endMatch = sub.match(/\n\s*(DECISÃO|ACORDAM|RELATÓRIO|FUNDAMENTAÇÃO|I\.|1\.|CONCLUSÃO)/i);
+      const end = endMatch ? endMatch.index : 4000;
       const candidate = sub.substring(0, end).trim();
       if (candidate.length > 50) return cleanRunningText(candidate);
     }
@@ -142,10 +140,8 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const processMatch = headerText.match(/(\d+[\.\/]\d+[\.\/]?\d*[A-Z\-\.]+[A-Z0-9\-\.]*)/);
   const processo = processMatch ? processMatch[1] : 'N/D';
 
-  // Tentativa focada de extração de sumário
   let sumario = extractTargetedSummary(pagesText);
 
-  // Fallback para o método antigo se falhar
   if (!sumario) {
       const sumarioMatch = fullRawText.match(/Sumário:?\s*([\s\S]*?)(?=(Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Notas:|Bibliografia|$))/i);
       if (sumarioMatch && sumarioMatch[1]) {

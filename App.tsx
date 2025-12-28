@@ -4,10 +4,8 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, ShieldCheck, AlertTriangle, Upload, FolderOpen, Key, MessageSquare, Download, History } from 'lucide-react';
 
-// A lista completa de 1309 descritores deve ser mantida aqui. 
-// Para brevidade no código, mantemos a estrutura expansível.
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
   "Abuso de confiança", "Abuso do direito", "Acareação", "Acção de anulação e interpretação de cláusulas de CCT",
@@ -121,7 +119,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Extinção de posto de trabalho", "Extinção de sociedade", "Extinção do contrato de trabalho", "Extinção do poder jurisdicional",
   "Facility Services", "Facto constitutivo", "Facto duradouro", "Factor de bonificação 1,5", "Factos admitidos por acordo",
   "Factos complementares", "Factos conclusivos", "Factos concretizadores", "Factos continuados", "Factos essenciais",
-  "Factos instrumentais", "Factos não alegados", "Factos não constantes da nota de culpa", "Factos notórios", "Factos pessoais",
+  "Factos instrumentais", "Factos não alegados", "Factos não constantes da nota de culpa", "Factos notórios", "Factos pessoal",
   "Factos supervenientes", "Facturas", "Falência", "Falsas declarações", "Falta da entidade responsável",
   "Falta de apresentação do procedimento disciplinar", "Falta de aviso prévio", "Falta de citação", "Falta de contestação",
   "Falta de fundamentação", "Falta de pagamento da retribuição", "Falta do réu", "Falta grave e indesculpável",
@@ -289,7 +287,6 @@ const SOCIAL_DESCRIPTORS_LIST = [
 
 function App() {
   const [db, setDb] = useState<Acordao[]>([]);
-  const [savedSearches, setSavedSearches] = useState<SearchResult[]>([]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [descriptors, setDescriptors] = useState<{social: string[], crime: string[], civil: string[]}>({
     social: Array.from(new Set(SOCIAL_DESCRIPTORS_LIST)).sort(),
@@ -305,13 +302,13 @@ function App() {
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
     setOnboardingStep('app');
   };
 
-  // Extração dinâmica de juízes baseada no DB atual
   useEffect(() => {
     const extracted = new Set<string>();
     db.forEach(ac => {
@@ -328,17 +325,13 @@ function App() {
     const othersLower = others.map(o => o.trim().toLowerCase());
 
     setDb(currentDb => {
-      const newDb = currentDb.map(ac => {
+      return currentDb.map(ac => {
         let changed = false;
-        
-        // Relator
         let newRelator = ac.relator.trim();
         if (othersLower.includes(newRelator.toLowerCase())) {
           newRelator = mainClean;
           changed = true;
         }
-        
-        // Adjuntos
         const newAdjuntos = ac.adjuntos.map(adj => {
           const adjTrimmed = adj.trim();
           if (othersLower.includes(adjTrimmed.toLowerCase())) {
@@ -349,15 +342,12 @@ function App() {
         });
 
         if (changed) {
-            // Limpeza de duplicados e garantia de que relator não é adjunto
             const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
               .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
-            
             return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
         }
         return ac;
       });
-      return [...newDb]; // Forçar nova referência
     });
   };
 
@@ -408,7 +398,16 @@ function App() {
     const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `juris_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `juris_backup_legal_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  };
+
+  const handleSaveChats = () => {
+    const json = JSON.stringify({ chatSessions }, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `juris_chats_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
   };
 
@@ -429,16 +428,48 @@ function App() {
         }
         setOnboardingStep('app');
       } catch (err) {
-        alert("Erro ao ler ficheiro de backup.");
+        alert("Erro ao ler ficheiro de backup jurídico.");
       }
     };
     reader.readAsText(file);
     e.target.value = ''; 
   };
 
+  const handleLoadChatFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target?.result as string);
+        if (parsed.chatSessions) {
+            setChatSessions(current => {
+                const existingIds = new Set(current.map(s => s.id));
+                const filteredNew = parsed.chatSessions.filter((s: ChatSession) => !existingIds.has(s.id));
+                return [...filteredNew, ...current];
+            });
+            alert("Base de dados de chat carregada e fundida com sucesso.");
+        }
+      } catch (err) {
+        alert("Erro ao ler ficheiro de chat.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const handleOpenKey = async () => {
-    // @ts-ignore
-    await window.aistudio.openSelectKey();
+    try {
+        // @ts-ignore
+        if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
+            // @ts-ignore
+            await window.aistudio.openSelectKey();
+        } else {
+            alert("A funcionalidade de seleção de chave não está disponível neste ambiente.");
+        }
+    } catch (err) {
+        console.error("Erro ao abrir seletor de chave:", err);
+    }
   };
 
   const mainContent = onboardingStep === 'app' ? (
@@ -448,19 +479,35 @@ function App() {
           <div className="flex items-center gap-4">
             <ScaleIcon className="w-8 h-8 text-legal-100" />
             <div>
-              <h1 className="text-2xl font-black tracking-tighter uppercase">JurisAnalítica</h1>
-              <p className="text-[10px] text-legal-300 uppercase tracking-widest font-black">{legalArea || 'Local'}</p>
+              <h1 className="text-2xl font-black tracking-tighter uppercase leading-none">JurisAnalítica</h1>
+              <p className="text-[9px] text-legal-400 uppercase tracking-widest font-black mt-1">Área {legalArea}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={handleOpenKey} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
+            <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
+            
+            {/* Secção de Chats */}
+            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
+                <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Chats">
+                    <History className="w-4 h-4" />
+                </button>
+                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-legal-700 hover:bg-legal-600 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Chats">
+                    <Download className="w-4 h-4" /> Chats
+                </button>
+            </div>
+
+            {/* Secção Legal */}
+            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700">
+                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white hover:bg-legal-700 rounded-xl transition-all" title="Importar Acórdãos/Backup Geral">
+                    <Upload className="w-4 h-4" />
+                </button>
+                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all" title="Backup Geral (Acórdãos e Descritores)">
+                    <Save className="w-4 h-4" /> Acórdãos
+                </button>
+            </div>
+
+            <button onClick={handleOpenKey} className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all ml-2">
               <Key className="w-4 h-4" /> Chave API
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} className="bg-legal-800 hover:bg-legal-700 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 border border-legal-700 transition-all">
-              <FolderOpen className="w-4 h-4" /> Importar
-            </button>
-            <button onClick={handleSaveDb} className="bg-white text-legal-900 hover:bg-legal-50 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase shadow-sm flex items-center gap-2 transition-all">
-              <Save className="w-4 h-4" /> Backup
             </button>
           </div>
         </div>
@@ -470,7 +517,7 @@ function App() {
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
             {['process', 'search', 'chat'].map((tab: any) => (
               <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
+                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria IA'}
               </button>
             ))}
         </div>
@@ -504,7 +551,15 @@ function App() {
               <ChatModule 
                 db={db} 
                 sessions={chatSessions} 
-                onSaveSession={s => setChatSessions(p => [s, ...p])} 
+                onSaveSession={s => setChatSessions(p => {
+                    const idx = p.findIndex(x => x.id === s.id);
+                    if (idx > -1) {
+                        const next = [...p];
+                        next[idx] = s;
+                        return next;
+                    }
+                    return [s, ...p];
+                })} 
                 onDeleteSession={(id) => setChatSessions(p => p.filter(s => s.id !== id))} 
                 onOpenPdf={openPdf}
               />
@@ -538,10 +593,15 @@ function App() {
                 </div>
               </button>
             ))}
-            <div className="h-px bg-slate-700/50 my-2"></div>
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center justify-center gap-3 p-4 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-xs uppercase tracking-widest">
-              <Upload className="w-4 h-4"/> Carregar Backup (.json)
-            </button>
+            <div className="h-px bg-slate-700/50 my-6"></div>
+            <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
+                    <Upload className="w-5 h-5 group-hover:scale-110 transition-transform"/> Backup Geral
+                </button>
+                <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 transition-all font-bold text-[9px] uppercase tracking-widest group">
+                    <MessageSquare className="w-5 h-5 group-hover:scale-110 transition-transform"/> Só Chats
+                </button>
+            </div>
           </div>
       </div>
     </div>
@@ -550,12 +610,21 @@ function App() {
   return (
     <>
       {mainContent}
+      {/* Input para carregar acórdãos/backup legal */}
       <input 
         type="file" 
         ref={fileInputRef} 
         className="hidden" 
         accept=".json" 
         onChange={handleLoadDbFile}
+      />
+      {/* Input para carregar apenas histórico de chat */}
+      <input 
+        type="file" 
+        ref={chatInputRef} 
+        className="hidden" 
+        accept=".json" 
+        onChange={handleLoadChatFile}
       />
     </>
   );
