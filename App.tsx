@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, SearchResult, ChatSession } from './types';
-import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, Info, Sparkles, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Scale, Save, Key, Briefcase, Gavel, Scale as ScaleIcon, RotateCcw, Info, Sparkles, ShieldCheck, AlertTriangle, Upload } from 'lucide-react';
 
 const DEFAULT_SOCIAL = ["Abandono do trabalho", "Acidente de trabalho", "Assédio", "Despedimento", "Férias", "Greve", "Insolvência", "Retribuição"];
 
@@ -31,22 +31,31 @@ function App() {
 
   useEffect(() => {
     const checkKey = async () => {
-      if (window.aistudio) {
-        const has = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(has);
+      try {
+        if (window.aistudio) {
+          const has = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(has);
+        }
+      } catch (e) {
+        console.error("Erro ao verificar chave:", e);
       }
     };
     checkKey();
-    // Re-check periodically
-    const interval = setInterval(checkKey, 2000);
+    const interval = setInterval(checkKey, 3000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSetupKey = async () => {
-    if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // Assume success as per guidelines to mitigate race condition
-      setHasApiKey(true);
+    try {
+      if (window.aistudio) {
+        console.log("A abrir seletor de chave...");
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true);
+      } else {
+        alert("O ambiente de execução não suporta a configuração de chave dinâmica. Utilize as variáveis de ambiente.");
+      }
+    } catch (e) {
+      console.error("Erro ao configurar chave:", e);
     }
   };
 
@@ -139,10 +148,14 @@ function App() {
         if (parsed.db) setDb(prev => [...prev, ...parsed.db.filter((x:any) => !prev.find(p=>p.id===x.id))]);
         if (parsed.savedSearches) setSavedSearches(parsed.savedSearches);
         if (parsed.chatSessions) setChatSessions(parsed.chatSessions);
+        if (parsed.descriptors) setDescriptors(parsed.descriptors);
         setOnboardingStep('app');
-      } catch (err) {}
+      } catch (err) {
+        alert("Erro ao processar o ficheiro de backup.");
+      }
     };
     reader.readAsText(file);
+    e.target.value = '';
   };
 
   if (onboardingStep !== 'app') {
@@ -173,7 +186,9 @@ function App() {
                   </div>
                 </button>
               ))}
-              <button onClick={() => fileInputRef.current?.click()} className="mt-4 text-xs text-blue-400 hover:underline font-bold uppercase tracking-widest">Ou Carregar Cópia de Segurança (.json)</button>
+              <button onClick={() => fileInputRef.current?.click()} className="mt-4 flex items-center justify-center gap-2 text-xs text-blue-400 hover:underline font-bold uppercase tracking-widest">
+                <Upload className="w-3.5 h-3.5"/> Carregar Cópia de Segurança (.json)
+              </button>
             </div>
         </div>
         <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
@@ -200,7 +215,7 @@ function App() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button 
               onClick={handleSetupKey}
               className={`flex items-center gap-2.5 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg active:scale-95 ${hasApiKey ? 'bg-green-600/20 border border-green-500/50 text-green-400' : 'bg-orange-600 text-white animate-pulse'}`}
@@ -209,72 +224,59 @@ function App() {
               {hasApiKey ? 'Chave Ativa' : 'Configurar Chave API'}
             </button>
 
-            <div className="h-10 w-px bg-legal-700 opacity-30 mx-2"></div>
+            <div className="h-10 w-px bg-legal-700 opacity-30 mx-1"></div>
             
-            <button onClick={handleSaveDb} className="flex items-center gap-2.5 px-6 py-3 bg-white text-legal-900 hover:bg-legal-100 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
-              <Save className="w-4 h-4" /> Backup
+            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2.5 bg-legal-800 text-legal-100 hover:bg-legal-700 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+              <Upload className="w-3.5 h-3.5" /> Carregar
+            </button>
+
+            <button onClick={handleSaveDb} className="flex items-center gap-2 px-6 py-2.5 bg-white text-legal-900 hover:bg-legal-100 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl transition-all active:scale-95">
+              <Save className="w-3.5 h-3.5" /> Backup
             </button>
           </div>
         </div>
       </header>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        {!rootHandleName && db.length === 0 ? (
-          <ProcessingModule 
-            onDataLoaded={(newData) => setDb(prev => [...prev, ...newData])} 
-            existingDB={db}
-            onSetRootHandle={handleSetRoot}
-            rootHandleName={rootHandleName}
-            onCacheFiles={setCachedFiles}
-            onAddDescriptors={(cat, list) => setDescriptors(p => ({...p, [cat]: Array.from(new Set([...p[cat], ...list])).sort()}))}
-            onAddJudges={(list) => setJudges(p => Array.from(new Set([...p, ...list])).sort())}
-            onMergeJudges={handleMergeJudges}
-            availableJudges={judges}
-            availableDescriptors={legalArea ? descriptors[legalArea] : []}
-          />
-        ) : (
-          <>
-            <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
-               {['process', 'search', 'chat'].map((tab: any) => (
-                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
-                    {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
-                 </button>
-               ))}
-            </div>
-            <div className="flex-1 overflow-hidden bg-gray-50 relative">
-               {activeTab === 'process' && (
-                 <ProcessingModule 
-                   onDataLoaded={d => setDb(p => [...p, ...d])} 
-                   existingDB={db} 
-                   onSetRootHandle={handleSetRoot} 
-                   rootHandleName={rootHandleName} 
-                   onCacheFiles={setCachedFiles} 
-                   onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
-                   onAddJudges={setJudges} 
-                   onMergeJudges={handleMergeJudges}
-                   availableJudges={judges} 
-                   availableDescriptors={legalArea?descriptors[legalArea]:[]}
-                 />
-               )}
-               {activeTab === 'search' && (
-                 <SearchModule 
-                    db={db} 
-                    onSaveSearch={s => setSavedSearches(p => [...p, s])} 
-                    savedSearches={savedSearches} 
-                    onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} 
-                    onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} 
-                    onOpenPdf={openPdf} 
-                    onGetPdfData={getPdfData} 
-                    onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
-                    availableDescriptors={legalArea?descriptors[legalArea]:[]} 
-                    availableJudges={judges} 
-                    onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}
-                 />
-               )}
-               {activeTab === 'chat' && <ChatModule db={db} sessions={chatSessions} onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} onOpenPdf={openPdf}/>}
-            </div>
-          </>
-        )}
+        <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
+            {['process', 'search', 'chat'].map((tab: any) => (
+              <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 px-2 text-[11px] font-black uppercase tracking-[0.15em] border-b-[3px] transition-all ${activeTab === tab ? 'border-legal-600 text-legal-900' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+                {tab === 'process' ? 'Processamento' : tab === 'search' ? 'Biblioteca' : 'Consultoria'}
+              </button>
+            ))}
+        </div>
+        <div className="flex-1 overflow-hidden bg-gray-50 relative">
+            {activeTab === 'process' && (
+              <ProcessingModule 
+                onDataLoaded={d => setDb(p => [...p, ...d])} 
+                existingDB={db} 
+                onSetRootHandle={handleSetRoot} 
+                rootHandleName={rootHandleName} 
+                onCacheFiles={setCachedFiles} 
+                onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
+                onAddJudges={setJudges} 
+                onMergeJudges={handleMergeJudges}
+                availableJudges={judges} 
+                availableDescriptors={legalArea?descriptors[legalArea]:[]}
+              />
+            )}
+            {activeTab === 'search' && (
+              <SearchModule 
+                db={db} 
+                onSaveSearch={s => setSavedSearches(p => [...p, s])} 
+                savedSearches={savedSearches} 
+                onDeleteSearch={id => setSavedSearches(p => p.filter(s=>s.id!==id))} 
+                onUpdateSearchName={(id, n) => setSavedSearches(p => p.map(s=>s.id===id?({...s, name:n}):s))} 
+                onOpenPdf={openPdf} 
+                onGetPdfData={getPdfData} 
+                onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
+                availableDescriptors={legalArea?descriptors[legalArea]:[]} 
+                availableJudges={judges} 
+                onAddDescriptors={l => setDescriptors(p=>({...p, [legalArea!]:l}))}
+              />
+            )}
+            {activeTab === 'chat' && <ChatModule db={db} sessions={chatSessions} onSaveSession={s => setChatSessions(p => p.find(x=>x.id===s.id) ? p.map(x=>x.id===s.id?s:x) : [s, ...p])} onDeleteSession={id => setChatSessions(p => p.filter(s=>s.id!==id))} onOpenPdf={openPdf}/>}
+        </div>
       </div>
       <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleLoadDbFile}/>
     </div>
