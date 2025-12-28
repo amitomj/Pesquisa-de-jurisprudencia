@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Tag, AlignLeft, Filter, X, Activity, UserCheck, Pencil, Save, Play, ChevronDown, Loader2, CheckCircle2 } from 'lucide-react';
+import { Search, FileText, Tag, AlignLeft, Filter, X, Activity, UserCheck, Pencil, Save, Play, ChevronDown, Loader2, CheckCircle2, Users } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const normalizeFuzzy = (str: string) => {
@@ -272,12 +272,31 @@ const SearchModule: React.FC<{
                             {item.descritores.map((tag, idx) => (<span key={idx} className="bg-legal-50 text-legal-800 text-[9px] font-black uppercase px-3 py-1.5 rounded-lg border border-legal-100">{tag}</span>))}
                         </div>
                     </div>
-                    <div className="bg-gray-50 rounded-[2rem] p-6 space-y-4 self-start">
+                    <div className="bg-gray-50 rounded-[2rem] p-6 space-y-6 self-start">
                         <div>
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Relator</span>
                           <div className={`text-[11px] font-black uppercase ${item.relator === 'Desconhecido' ? 'text-red-400' : 'text-legal-900'}`}>{item.relator}</div>
                         </div>
-                        <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Análise de Direito</span><div className="text-[9px] font-bold text-gray-500 uppercase">{item.fundamentacaoDireito ? `${Math.round(item.fundamentacaoDireito.length / 5)} palavras extraídas` : 'Não segmentado'}</div></div>
+                        
+                        {item.adjuntos && item.adjuntos.length > 0 && (
+                          <div>
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-2 flex items-center gap-1.5">
+                              Adjuntos
+                            </span>
+                            <div className="flex flex-col gap-1.5 pl-1 border-l-2 border-gray-200">
+                              {item.adjuntos.map((adj, i) => (
+                                <div key={i} className="text-[10px] font-bold uppercase text-gray-600 leading-tight">
+                                  {adj}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Análise de Direito</span>
+                          <div className="text-[9px] font-bold text-gray-500 uppercase">{item.fundamentacaoDireito ? `${Math.round(item.fundamentacaoDireito.length / 5)} palavras extraídas` : 'Não segmentado'}</div>
+                        </div>
                     </div>
                 </div>
               </div>
@@ -307,6 +326,7 @@ const SearchModule: React.FC<{
                 <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Relator</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.relator} onChange={e => setEditingItem({...editingItem, relator: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Data</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.data} onChange={e => setEditingItem({...editingItem, data: e.target.value})} /></div>
               </div>
+              <div><label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Adjuntos (separados por vírgula)</label><input className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold outline-none" value={editingItem.adjuntos.join(', ')} onChange={e => setEditingItem({...editingItem, adjuntos: e.target.value.split(',').map(s => s.trim())})} /></div>
               <div>
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-2">Sumário Literal (Deve ser fiel ao documento)</label>
                 <textarea rows={10} className="w-full p-6 bg-gray-50 border border-gray-100 rounded-[2rem] text-sm font-serif italic outline-none resize-none focus:ring-2 focus:ring-legal-100 transition-all" value={editingItem.sumario} onChange={e => setEditingItem({...editingItem, sumario: e.target.value})} />
