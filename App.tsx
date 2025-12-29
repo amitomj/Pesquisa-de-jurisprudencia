@@ -209,6 +209,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Princípio da concentração da defesa", "Princípio da confiança", "Princípio da cooperação", "Princípio da economia processual",
   "Princípio da filiação", "Princípio da igualdade", "Princípio da indivisibilidade da confissão",
   "Princípio da interpretação conforme o direito comunitário", "Princípio da irreversibilidade", "Princípio da legalidade",
+  "Princípio da liberdade de desvinculação", "Princípio da liberdade de desvinculação", "Princípio da legalidade",
   "Princípio da liberdade de desvinculação", "Princípio da livre apreciação da prova", "Princípio da preclusão",
   "Princípio da proporcionalidade", "Princípio da segurança no emprego", "Princípio do contraditório", "Princípio do dispositivo",
   "Princípio do pedido", "Princípio do tratamento mais favorável", "Princípio geral de aproveitamento do processado",
@@ -386,8 +387,9 @@ function App() {
         });
 
         if (changed) {
+            // FIX: Explicitly typing the filter parameter 'a' as string to resolve 'unknown' type errors for toLowerCase and length.
             const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
-              .filter(a => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
+              .filter((a: string) => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
             return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
         }
         return ac;

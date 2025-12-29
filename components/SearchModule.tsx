@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Acordao, SearchFilters } from '../types';
-import { Search, FileText, Tag, AlignLeft, Filter, X, Activity, UserCheck, Pencil, Save, Play, ChevronDown, Loader2, CheckCircle2, Users } from 'lucide-react';
+import { Search, FileText, Tag, AlignLeft, Filter, X, Activity, UserCheck, Pencil, Save, Play, ChevronDown, Loader2, Calendar } from 'lucide-react';
 import { extractMetadataWithAI } from '../services/geminiService';
 
 const normalizeFuzzy = (str: string) => {
@@ -88,14 +88,16 @@ const SearchModule: React.FC<{
 
       if (filters.dataInicio && item.data !== 'N/D') {
         const itemDate = new Date(item.data.split('-').reverse().join('-'));
-        if (itemDate < new Date(filters.dataInicio)) return false;
+        const startDate = new Date(filters.dataInicio);
+        if (itemDate < startDate) return false;
       }
       if (filters.dataFim && item.data !== 'N/D') {
         const itemDate = new Date(item.data.split('-').reverse().join('-'));
-        if (itemDate > new Date(filters.dataFim)) return false;
+        const endDate = new Date(filters.dataFim);
+        if (itemDate > endDate) return false;
       }
 
-      const searchableContent = `${item.sumario} ${item.fundamentacaoDireito} ${item.relatorio}`;
+      const searchableContent = `${item.sumario} ${item.fundamentacaoDireito} ${item.relatorio} ${item.processo}`;
       if (filters.booleanAnd) {
         const terms = filters.booleanAnd.split(',').map(t => t.trim());
         if (!terms.every(t => fuzzyMatch(searchableContent, t))) return false;
@@ -188,10 +190,39 @@ const SearchModule: React.FC<{
             <button onClick={() => setFilters({processo:'', relator:'', adjunto:'', descritor:'', dataInicio:'', dataFim:'', booleanAnd:'', booleanOr:'', booleanNot:''})} className="text-[9px] font-black uppercase text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg transition-all">Limpar</button>
         </div>
         <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-          <div className="space-y-4">
+          <div className="space-y-6">
             <SidebarAutocomplete label="Relator" options={availableJudges} value={filters.relator} onChange={v => setFilters({...filters, relator:v})} placeholder="Filtrar por relator..." />
             <SidebarAutocomplete label="Adjunto" options={availableJudges} value={filters.adjunto} onChange={v => setFilters({...filters, adjunto:v})} placeholder="Filtrar por adjunto..." />
+            
+            {/* Secção de Datas */}
+            <div className="pt-2">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3 flex items-center gap-2">
+                <Calendar className="w-3 h-3"/> Período
+              </label>
+              <div className="grid grid-cols-1 gap-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-gray-400 uppercase pointer-events-none">Desde</span>
+                  <input 
+                    type="date" 
+                    className="w-full pl-14 pr-3 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-legal-100"
+                    value={filters.dataInicio}
+                    onChange={e => setFilters({...filters, dataInicio: e.target.value})}
+                  />
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-gray-400 uppercase pointer-events-none">Até</span>
+                  <input 
+                    type="date" 
+                    className="w-full pl-14 pr-3 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none focus:ring-2 focus:ring-legal-100"
+                    value={filters.dataFim}
+                    onChange={e => setFilters({...filters, dataFim: e.target.value})}
+                  />
+                </div>
+              </div>
+            </div>
+
             <SidebarAutocomplete label="Descritor" options={availableDescriptors} value={filters.descritor} onChange={v => setFilters({...filters, descritor:v})} placeholder="Filtrar por tema..." />
+            
             <div className="pt-4 border-t border-gray-50">
               <label className="text-[9px] font-black text-legal-600 uppercase tracking-widest block mb-3">Pesquisa Booleana (Fuzzy)</label>
               <div className="space-y-2">
@@ -303,7 +334,7 @@ const SearchModule: React.FC<{
             </div>
           )) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-300 gap-4 uppercase font-black text-xs tracking-widest opacity-30 mt-20">
-              <Search className="w-16 h-16" /> Nenhum documento encontrado.
+              <Search className="w-16 h-16" /> Nenhum documento encontrado com os filtros atuais.
             </div>
           )}
         </div>

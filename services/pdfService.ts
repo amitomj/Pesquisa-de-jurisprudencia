@@ -4,8 +4,44 @@ import { Acordao } from '../types';
 const cleanText = (text: string) => text.replace(/\s+/g, ' ').trim();
 
 const preserveStructuralText = (text: string): string => {
-  // Preserva a estrutura mas limpa espaços excessivos
   return text.trim();
+};
+
+/**
+ * Remove ruído típico de acórdãos portugueses (cabeçalhos, rodapés, contactos, URLs)
+ */
+const cleanLegalPageText = (text: string): string => {
+  const lines = text.split('\n');
+  const noisyPatterns = [
+    /^\s*\d+\s*\/\s*\d+\s*$/i,                  // 1/10
+    /^\s*pág(?:ina)?\.?\s*\d+.*$/i,             // Pág. 1
+    /^\s*acórdão\s+do\s+tribunal.*$/i,           // Repetitivos
+    /^\s*processo\s+n\.?º\s+.*$/i,               // Cabeçalhos de processo
+    /^\s*www\..*?\.(?:pt|com|gov).*$/i,          // URLs
+    /^\s*rua\s+.*?\d+.*$/i,                      // Moradas no rodapé
+    /^\s*(?:tel|fax|e-mail|email)[:\s].*$/i,     // Contactos
+    /^\s*mod\.\s+\d+.*$/i,                       // Códigos de formulário
+    /^\s*assinado\s+eletronicamente.*$/i,        // Assinaturas digitais de rodapé
+    /^[\d\s]*$/                                  // Linhas só com números ou espaços
+  ];
+
+  // Filtra linhas que correspondem a padrões de ruído
+  // E remove linhas muito curtas no início/fim de cada página que pareçam notas órfãs
+  const cleanedLines = lines.filter((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return false;
+    
+    // Se a linha corresponder a um padrão de ruído conhecido
+    if (noisyPatterns.some(p => p.test(trimmed))) return false;
+
+    // Se for uma nota de rodapé (começa com número pequeno isolado)
+    // Normalmente notas de rodapé em acórdãos são descartáveis para o sumário literal
+    if (/^\s*\[?\d+\]?\s+[A-Z]/.test(trimmed) && index > lines.length - 5) return false;
+
+    return true;
+  });
+
+  return cleanedLines.join('\n');
 };
 
 const filterFactImpugnation = (text: string): string => {
@@ -47,12 +83,15 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     const textContent = await page.getTextContent();
     // @ts-ignore
     const strings = textContent.items.map((item: any) => item.str);
-    pagesText.push(strings.join(' '));
+    
+    // Limpamos cada página individualmente antes de juntar
+    const pageRawText = strings.join('\n');
+    pagesText.push(cleanLegalPageText(pageRawText));
   }
 
+  // Juntamos com quebra de linha mas o cleanLegalPageText já removeu o lixo entre as páginas
   const fullText = pagesText.join('\n');
   
-  // REGRA: Pesquisa de sumário apenas nas primeiras 3 e últimas 3 páginas
   const firstThree = pagesText.slice(0, 3).join('\n');
   const lastThree = pagesText.slice(Math.max(0, numPages - 3)).join('\n');
   const contextForSummary = `[INÍCIO DO DOCUMENTO]\n${firstThree}\n\n[FIM DO DOCUMENTO]\n${lastThree}`;
@@ -62,7 +101,8 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   let adjuntos: string[] = [];
   let tipoDecisao: 'Acórdão' | 'Decisão Sumária' = 'Acórdão';
 
-  const signatureRegex = /Assinado em\s+(\d{2}-\d{2}-\d{4}),\s*por\s*[\n\s]*([^\n,]+)/gi;
+  // O texto completo já está limpo, o que melhora a precisão do regex
+  const signatureRegex = /Assinado em\s+(\d{2}-\d{2}-\d{4}),\s*por\s*([^\n,]+)/gi;
   const matches = [...fullText.matchAll(signatureRegex)];
   if (matches.length > 0) {
     data = matches[0][1];
@@ -81,14 +121,14 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const factosNaoProvadosMatch = fullText.match(/(?:Factos\s+não\s+Provados)([\s\S]*?)(?=(?:III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
   const direitoMatch = fullText.match(/(?:Fundamentação\s+de\s+Direito|O\s+Direito|III\.\s*Direito)([\s\S]*?)(?=(?:IV\.\s*|Decisão|Conclusão|$))/i);
 
-  // EXTRAÇÃO LITERAL DO SUMÁRIO
+  // EXTRAÇÃO DO SUMÁRIO
   let sumario = 'Sumário não encontrado';
-  // Marcadores: Sumário, Sumário da responsabilidade do relator, etc.
   const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*[I1]\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Dispositivo|$))/i;
   
   const sumarioMatch = contextForSummary.match(sumarioRegex);
   if (sumarioMatch && sumarioMatch[1].trim().length > 10) {
-    sumario = sumarioMatch[1].trim();
+    // Limpeza final para remover excesso de quebras de linha que sobraram da limpeza de página
+    sumario = sumarioMatch[1].trim().replace(/\n{3,}/g, '\n\n');
   }
 
   return {
@@ -100,7 +140,7 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     data: cleanText(data),
     sumario: sumario,
     descritores: [],
-    textoAnalise: contextForSummary, // Para a IA focada apenas no sumário
+    textoAnalise: contextForSummary,
     textoCompleto: fullText,
     tipoDecisao,
     relatorio: relatorioMatch ? preserveStructuralText(relatorioMatch[1]) : '',

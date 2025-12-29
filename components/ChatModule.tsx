@@ -37,7 +37,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
 
   const handleSend = async () => {
     if (!apiKey) {
-      alert("Configure primeiro a sua Gemini API Key no topo.");
+      alert("⚠️ Configure primeiro a sua Gemini API Key no topo.");
       return;
     }
     if (!input.trim() || loading) return;
@@ -52,25 +52,45 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
     const updatedMessages = [...session.messages, userMsg];
     
     setCurrentSession({ ...session, messages: updatedMessages });
+    const userInput = input; // Capturamos para a IA
     setInput('');
     setLoading(true);
 
     try {
-      const keywords = input.toLowerCase().split(' ').filter(w => w.length > 3);
-      // Busca contexto focado no Direito
-      const relevantContext = db.filter(d => {
-        const text = (d.sumario + ' ' + (d.fundamentacaoDireito || '')).toLowerCase();
-        return keywords.some(k => text.includes(k));
-      }).slice(0, 35); 
+      // Normalização para pesquisa
+      const keywords = userInput.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .split(' ')
+        .filter(w => w.length > 3);
 
-      const answer = await generateLegalAnswer(input, relevantContext, apiKey);
+      // PESQUISA EM TODA A BASE DE DADOS (DB)
+      // Focamos exclusivamente em Sumário e Fundamentação de Direito
+      const relevantContext = db.filter(d => {
+        // Combinamos os campos de interesse para a pesquisa
+        const searchableText = `${d.sumario} ${d.fundamentacaoDireito} ${d.processo}`.toLowerCase()
+           .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        // Se houver palavras-chave, o documento deve conter pelo menos uma (OR) ou várias (melhoria de ranking)
+        // Aqui usamos um critério simples de "contém pelo menos uma keyword relevante"
+        return keywords.length === 0 || keywords.some(k => searchableText.includes(k));
+      })
+      // Ordenamos por "mais recente" por defeito para dar prioridade à jurisprudência atual
+      .sort((a, b) => {
+          const dateA = a.data !== 'N/D' ? new Date(a.data.split('-').reverse().join('-')).getTime() : 0;
+          const dateB = b.data !== 'N/D' ? new Date(b.data.split('-').reverse().join('-')).getTime() : 0;
+          return dateB - dateA;
+      })
+      .slice(0, 30); // Selecionamos os 30 mais relevantes/recentes para não exceder limites da IA
+
+      const answer = await generateLegalAnswer(userInput, relevantContext, apiKey);
       const botMsg: ChatMessage = { id: crypto.randomUUID(), role: 'model', content: answer, timestamp: Date.now(), sources: relevantContext };
 
       const finalSession = { ...session, messages: [...updatedMessages, botMsg] };
       setCurrentSession(finalSession);
       onSaveSession(finalSession);
     } catch (e) {
-      console.error(e);
+      console.error("Erro no fluxo do Chat:", e);
+      alert("Ocorreu um erro ao processar a sua consulta.");
     } finally { setLoading(false); }
   };
 
@@ -124,7 +144,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         {currentSession && (
           <div className="bg-white border-b px-10 py-4 flex items-center justify-between shadow-sm z-20">
              <div className="flex flex-col">
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Sessão Ativa</span>
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Consulta Jurídica</span>
                 <h2 className="text-xs font-black uppercase text-legal-900">{currentSession.title}</h2>
              </div>
              <div className="flex gap-2">
@@ -150,7 +170,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
           {!currentSession ? (
              <div className="h-full flex flex-col items-center justify-center text-gray-300 uppercase font-black tracking-widest text-xs gap-4">
                <Scale className="w-20 h-20 opacity-10"/> 
-               Selecione ou inicie uma nova consulta jurídica
+               Selecione ou inicie uma nova consulta baseada na sua biblioteca
              </div>
           ) : (
              currentSession.messages.map(msg => {
@@ -165,7 +185,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
                         
                         {msg.role === 'model' && citedDocs.length > 0 && (
                             <div className="mt-12 pt-10 border-t border-gray-100">
-                                <h4 className="text-[10px] font-black text-legal-900 uppercase tracking-[0.4em] mb-6 flex items-center gap-2 opacity-60"><Library className="w-4 h-4" /> Jurisprudência Citada</h4>
+                                <h4 className="text-[10px] font-black text-legal-900 uppercase tracking-[0.4em] mb-6 flex items-center gap-2 opacity-60"><Library className="w-4 h-4" /> Jurisprudência de Suporte</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {citedDocs.map(src => (
                                         <button key={src.id} onClick={() => onOpenPdf(src.fileName)} className="text-left bg-gray-50 border border-gray-100 p-6 rounded-[2rem] hover:bg-legal-900 hover:text-white transition-all shadow-sm flex items-start gap-4 group">
@@ -188,7 +208,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <div className="flex justify-start animate-pulse">
               <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-50 flex items-center gap-4">
                 <Bot className="w-8 h-8 text-legal-600 animate-bounce" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Analisando argumentos jurídicos...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Pesquisando em toda a biblioteca e analisando fundamentos...</span>
               </div>
             </div>
           )}
@@ -198,7 +218,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <input 
               type="text" 
               className="flex-1 border-2 border-gray-100 bg-gray-50 rounded-[2.5rem] p-6 focus:outline-none focus:ring-8 focus:ring-legal-50 focus:border-legal-200 transition-all text-lg font-bold placeholder:text-gray-300" 
-              placeholder="Pergunta Jurídica (ex: Qual o entendimento sobre a nulidade do contrato?)" 
+              placeholder="Pergunta sobre o entendimento jurídico da sua base..." 
               value={input} 
               onChange={e => setInput(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && handleSend()} 

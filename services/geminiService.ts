@@ -17,35 +17,61 @@ export const generateLegalAnswer = async (
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    const relevantContext = context.map(c => 
-      `ID_REF: ${c.id}\nProcesso: ${c.processo}\nSumário: ${c.sumario}\nFUNDAMENTAÇÃO DE DIREITO (Isolada):\n${(c.fundamentacaoDireito || c.textoCompleto).substring(0, 4000)}`
-    ).join('\n---\n');
+    const relevantContext = context.map(c => {
+      const direito = c.fundamentacaoDireito || "[Fundamentação de Direito não segmentada separadamente]";
+      return `ID_REF: ${c.id}
+Processo: ${c.processo}
+Data: ${c.data}
+Relator: ${c.relator}
+Tribunal: ${c.fileName.toLowerCase().includes('trl') ? 'Relação de Lisboa' : c.fileName.toLowerCase().includes('trp') ? 'Relação do Porto' : c.fileName.toLowerCase().includes('trc') ? 'Relação de Coimbra' : c.fileName.toLowerCase().includes('trg') ? 'Relação de Guimarães' : c.fileName.toLowerCase().includes('tre') ? 'Relação de Évora' : 'Tribunal Superior'}
+SUMÁRIO:
+${c.sumario}
+
+FUNDAMENTAÇÃO JURÍDICA:
+${direito.substring(0, 7000)}`;
+    }).join('\n\n---\n\n');
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
-      contents: `És um consultor jurídico sénior. Analisa os fundamentos de direito dos acórdãos fornecidos e responde à questão técnica.
-      
-REGRAS:
-1. FOCO NO DIREITO: Ignora a matéria de facto, foca-te na interpretação jurídica.
-2. CITAÇÕES: Usa [ID_REF: uuid] para fundamentar.
-3. CONTRADIÇÕES: Identifica se há divergências de entendimento jurídico.
+      contents: `Atua como um Consultor Jurídico Sénior. Analisa os acórdãos fornecidos e elabora uma resposta estruturada sobre a questão colocada.
 
-CONTEXTO:
+A TUA RESPOSTA DEVE SEGUIR ESTE MODELO RIGOROSO:
+
+1. ENQUADRAMENTO INICIAL
+- Descreve brevemente se existe consenso ou divisão na jurisprudência sobre o tema.
+- Usa um tom formal e técnico.
+
+2. POSIÇÕES JURÍDICAS IDENTIFICADAS (Usa numeração para cada corrente/tese)
+Para cada posição:
+- Define a tese (ex: "Posição favorável a...", "Posição restritiva que defende...").
+- Explica o fundamento jurídico (ex: "interpretação teleológica", "aplicação direta do art. X").
+- CITA OS ACÓRDÃOS que sustentam esta posição indicando: Tribunal, Data, Processo e a ID_REF no formato [ID_REF: uuid].
+
+3. NÚCLEO CENTRAL DA DIVERGÊNCIA
+- Identifica o ponto exato onde os tribunais divergem (ex: "A divergência reside na interpretação da alínea Y...").
+- Menciona princípios interpretativos relevantes (ex: "natureza excecional das leis", "interpretação extensiva").
+
+REGRAS:
+- NUNCA menciones factos concretos dos casos (nomes de arguidos, locais, etc). Foca-te apenas no DIREITO.
+- Se houver apenas uma posição nos acórdãos fornecidos, apresenta-a como o entendimento dominante na base consultada.
+- Usa IDs de referência [ID_REF: uuid] sempre que citar um acórdão.
+
+CONTEXTO DOS ACÓRDÃOS:
 ${relevantContext}
 
-QUESTÃO: 
+QUESTÃO DO UTILIZADOR: 
 ${question}`,
       config: {
         temperature: 0.1,
-        thinkingConfig: { thinkingBudget: 4000 }
+        thinkingConfig: { thinkingBudget: 8000 } // Maior orçamento para análise jurídica profunda
       }
     });
 
-    return response.text || "Sem resposta.";
+    return response.text || "Não foi possível gerar uma análise jurídica baseada nos documentos fornecidos.";
   } catch (error: any) {
     const errType = await handleApiError(error);
-    if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de quota atingido.";
-    return "Erro na IA. Verifique a sua chave.";
+    if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de quota da API excedido.";
+    return "Erro técnico na geração da resposta jurídica.";
   }
 };
 
@@ -54,18 +80,18 @@ export const extractMetadataWithAI = async (textContext: string, availableDescri
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Atua como um extrator de texto literal. 
+      contents: `Atua como um extrator de texto literal de acórdãos judiciais. 
 
 REGRAS CRÍTICAS PARA O SUMÁRIO:
 1. NÃO RESUMAS: O sumário deve ser EXTRAÍDO LITERALMENTE (letra a letra) do texto fornecido.
-2. LOCALIZAÇÃO: Procura por marcadores como "Sumário:", "Sumário da responsabilidade do relator:" ou equivalentes.
-3. SE NÃO EXISTIR: Se não encontrares um sumário explícito e literal, devolve OBRIGATORIAMENTE a frase: "Sumário não encontrado".
-4. É PROIBIDO criar um sumário novo baseado no resto do documento.
+2. CONTINUIDADE: Se o sumário estiver dividido por quebras de página, junta o texto de forma contínua.
+3. LIMPEZA ABSOLUTA: Remove/Ignora explicitamente quaisquer números de página (ex: "1/10"), moradas, contactos ou nomes de tribunais que apareçam no meio do texto por causa das quebras de página.
+4. SE NÃO EXISTIR: Se não encontrares um sumário explícito e literal, devolve OBRIGATORIAMENTE a frase: "Sumário não encontrado".
 
 DESCRITORES:
 Escolhe 3-5 descritores da lista oficial que melhor se adequem ao tema: [${availableDescriptors.join(", ")}]
 
-TEXTO DO DOCUMENTO (Segmentos do Início e Fim):
+TEXTO DO DOCUMENTO (Segmentos):
 ${textContext}`,
       config: {
         responseMimeType: "application/json",
@@ -75,7 +101,7 @@ ${textContext}`,
             data: { type: Type.STRING },
             relator: { type: Type.STRING },
             adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            sumario: { type: Type.STRING, description: "O sumário literal extraído ou 'Sumário não encontrado'." },
+            sumario: { type: Type.STRING, description: "O sumário literal limpo de lixo de layout." },
             descritores: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["data", "relator", "adjuntos", "sumario", "descritores"]
