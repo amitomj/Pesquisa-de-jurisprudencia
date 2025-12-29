@@ -19,51 +19,54 @@ export const generateLegalAnswer = async (
     
     const relevantContext = context.map(c => {
       const direito = c.fundamentacaoDireito || "[Fundamentação de Direito não segmentada separadamente]";
-      return `ID_REF: ${c.id}
+      return `### DOCUMENTO JURÍDICO
+ID_REF: ${c.id}
 Processo: ${c.processo}
 Data: ${c.data}
 Relator: ${c.relator}
 Tribunal: ${c.fileName.toLowerCase().includes('trl') ? 'Relação de Lisboa' : c.fileName.toLowerCase().includes('trp') ? 'Relação do Porto' : c.fileName.toLowerCase().includes('trc') ? 'Relação de Coimbra' : c.fileName.toLowerCase().includes('trg') ? 'Relação de Guimarães' : c.fileName.toLowerCase().includes('tre') ? 'Relação de Évora' : 'Tribunal Superior'}
+
 SUMÁRIO:
 ${c.sumario}
 
 FUNDAMENTAÇÃO JURÍDICA:
-${direito.substring(0, 7000)}`;
+${direito.substring(0, 7500)}`;
     }).join('\n\n---\n\n');
 
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
       contents: `Atua como um Consultor Jurídico Sénior. Analisa os acórdãos fornecidos e elabora uma resposta estruturada sobre a questão colocada.
 
+IMPORTANTE: O utilizador pode referir-se a processos específicos (ex: 883/21.0T8VFR.P1). Verifica SEMPRE se algum dos documentos abaixo corresponde ao processo solicitado antes de dizer que não o encontras.
+
 A TUA RESPOSTA DEVE SEGUIR ESTE MODELO RIGOROSO:
 
 1. ENQUADRAMENTO INICIAL
 - Descreve brevemente se existe consenso ou divisão na jurisprudência sobre o tema.
-- Usa um tom formal e técnico.
+- Se o utilizador perguntou por um processo específico, identifica-o logo aqui.
 
 2. POSIÇÕES JURÍDICAS IDENTIFICADAS (Usa numeração para cada corrente/tese)
 Para cada posição:
 - Define a tese (ex: "Posição favorável a...", "Posição restritiva que defende...").
-- Explica o fundamento jurídico (ex: "interpretação teleológica", "aplicação direta do art. X").
+- Explica o fundamento jurídico.
 - CITA OS ACÓRDÃOS que sustentam esta posição indicando: Tribunal, Data, Processo e a ID_REF no formato [ID_REF: uuid].
 
 3. NÚCLEO CENTRAL DA DIVERGÊNCIA
-- Identifica o ponto exato onde os tribunais divergem (ex: "A divergência reside na interpretação da alínea Y...").
-- Menciona princípios interpretativos relevantes (ex: "natureza excecional das leis", "interpretação extensiva").
+- Identifica o ponto exato onde os tribunais divergem.
+- Menciona princípios interpretativos relevantes.
 
 REGRAS:
 - NUNCA menciones factos concretos dos casos (nomes de arguidos, locais, etc). Foca-te apenas no DIREITO.
-- Se houver apenas uma posição nos acórdãos fornecidos, apresenta-a como o entendimento dominante na base consultada.
 - Usa IDs de referência [ID_REF: uuid] sempre que citar um acórdão.
 
-CONTEXTO DOS ACÓRDÃOS:
+CONTEXTO DOS ACÓRDÃOS DISPONÍVEIS:
 ${relevantContext}
 
 QUESTÃO DO UTILIZADOR: 
 ${question}`,
       config: {
         temperature: 0.1,
-        thinkingConfig: { thinkingBudget: 8000 } // Maior orçamento para análise jurídica profunda
+        thinkingConfig: { thinkingBudget: 8000 }
       }
     });
 

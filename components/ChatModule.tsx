@@ -15,6 +15,9 @@ interface Props {
   apiKey: string;
 }
 
+// Função para normalizar números de processo (remove pontos, barras, traços)
+const canonicalizeProcesso = (p: string) => p.replace(/[\.\/\-\s]/g, '').toLowerCase();
+
 const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf, apiKey }) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [input, setInput] = useState('');
@@ -52,35 +55,59 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
     const updatedMessages = [...session.messages, userMsg];
     
     setCurrentSession({ ...session, messages: updatedMessages });
-    const userInput = input; // Capturamos para a IA
+    const userInput = input; 
     setInput('');
     setLoading(true);
 
     try {
-      // Normalização para pesquisa
-      const keywords = userInput.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .split(' ')
-        .filter(w => w.length > 3);
+      // Normalização para pesquisa geral
+      const userInputLower = userInput.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      
+      // Extração de tokens: Mantemos palavras > 3 letras OU qualquer token que contenha números (provável processo)
+      const keywords = userInputLower.split(/[\s,.;]+/).filter(w => w.length > 3 || /\d/.test(w));
+      
+      // Versão "limpa" da pergunta para encontrar processos
+      const canonicalInput = canonicalizeProcesso(userInput);
 
       // PESQUISA EM TODA A BASE DE DADOS (DB)
-      // Focamos exclusivamente em Sumário e Fundamentação de Direito
       const relevantContext = db.filter(d => {
-        // Combinamos os campos de interesse para a pesquisa
-        const searchableText = `${d.sumario} ${d.fundamentacaoDireito} ${d.processo}`.toLowerCase()
+        const searchableText = `${d.sumario} ${d.fundamentacaoDireito} ${d.processo} ${d.relator}`.toLowerCase()
            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
-        // Se houver palavras-chave, o documento deve conter pelo menos uma (OR) ou várias (melhoria de ranking)
-        // Aqui usamos um critério simples de "contém pelo menos uma keyword relevante"
-        return keywords.length === 0 || keywords.some(k => searchableText.includes(k));
+        const canonicalProc = canonicalizeProcesso(d.processo);
+
+        // Correspondência por Número de Processo Canónico (Alta Prioridade)
+        if (canonicalInput.includes(canonicalProc) && canonicalProc.length > 3) return true;
+
+        // Correspondência por Keywords
+        return keywords.length > 0 && keywords.some(k => searchableText.includes(k) || canonicalProc.includes(canonicalizeProcesso(k)));
       })
-      // Ordenamos por "mais recente" por defeito para dar prioridade à jurisprudência atual
+      // Ordenação: Documentos cujo número de processo aparece na pergunta sobem para o topo
       .sort((a, b) => {
+          const aInInput = canonicalInput.includes(canonicalizeProcesso(a.processo));
+          const bInInput = canonicalInput.includes(canonicalizeProcesso(b.processo));
+          if (aInInput && !bInInput) return -1;
+          if (!aInInput && bInInput) return 1;
+          
           const dateA = a.data !== 'N/D' ? new Date(a.data.split('-').reverse().join('-')).getTime() : 0;
           const dateB = b.data !== 'N/D' ? new Date(b.data.split('-').reverse().join('-')).getTime() : 0;
           return dateB - dateA;
       })
-      .slice(0, 30); // Selecionamos os 30 mais relevantes/recentes para não exceder limites da IA
+      .slice(0, 25); 
+
+      if (relevantContext.length === 0) {
+        const botMsg: ChatMessage = { 
+          id: crypto.randomUUID(), 
+          role: 'model', 
+          content: "Lamento, mas não consegui encontrar na sua base de dados o processo mencionado ou documentos relevantes para a sua questão. Certifique-se de que o documento foi corretamente processado no separador 'Processamento'.", 
+          timestamp: Date.now() 
+        };
+        const finalSession = { ...session, messages: [...updatedMessages, botMsg] };
+        setCurrentSession(finalSession);
+        onSaveSession(finalSession);
+        setLoading(false);
+        return;
+      }
 
       const answer = await generateLegalAnswer(userInput, relevantContext, apiKey);
       const botMsg: ChatMessage = { id: crypto.randomUUID(), role: 'model', content: answer, timestamp: Date.now(), sources: relevantContext };
@@ -124,7 +151,6 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
 
   return (
     <div className="flex h-full bg-gray-50 overflow-hidden">
-      {/* Sidebar de Histórico */}
       <div className="w-72 bg-white border-r flex flex-col shadow-sm">
         <div className="p-6 border-b">
           <button onClick={startNewChat} className="w-full bg-legal-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:bg-black transition-all">Novo Chat</button>
@@ -139,7 +165,6 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         </div>
       </div>
 
-      {/* Área de Chat */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {currentSession && (
           <div className="bg-white border-b px-10 py-4 flex items-center justify-between shadow-sm z-20">
@@ -151,14 +176,12 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
                 <button 
                   onClick={() => exportChatSession(currentSession, db)}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-xl text-[9px] font-black uppercase border border-blue-100 hover:bg-blue-600 hover:text-white transition-all"
-                  title="Exportar para Word (.doc)"
                 >
                   <FileType className="w-3.5 h-3.5" /> Word
                 </button>
                 <button 
                   onClick={() => handleExportJson(currentSession)}
                   className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-xl text-[9px] font-black uppercase border border-green-100 hover:bg-green-600 hover:text-white transition-all"
-                  title="Guardar Backup JSON"
                 >
                   <FileJson className="w-3.5 h-3.5" /> Backup JSON
                 </button>
@@ -180,7 +203,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
                return (
                  <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2`}>
                    <div className={`max-w-[90%] rounded-[2.5rem] p-10 shadow-2xl border ${msg.role === 'user' ? 'bg-legal-900 text-white border-legal-950' : 'bg-white border-gray-100'}`}>
-                        {msg.role === 'model' && <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-50"><Bot className="w-5 h-5 text-legal-600"/><span className="text-[10px] font-black uppercase text-legal-900">Análise da Fundamentação de Direito</span></div>}
+                        {msg.role === 'model' && <div className="flex items-center gap-2 mb-6 pb-4 border-b border-gray-50"><Bot className="w-5 h-5 text-legal-600"/><span className="text-[10px] font-black uppercase text-legal-900">Análise Jurídica</span></div>}
                         {msg.role === 'model' ? <TextWithRefs content={msg.content} sources={msg.sources || []} /> : <p className="font-bold text-lg leading-tight tracking-tight">{msg.content}</p>}
                         
                         {msg.role === 'model' && citedDocs.length > 0 && (
@@ -208,7 +231,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <div className="flex justify-start animate-pulse">
               <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-50 flex items-center gap-4">
                 <Bot className="w-8 h-8 text-legal-600 animate-bounce" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Pesquisando em toda a biblioteca e analisando fundamentos...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Analisando base de dados e redigindo resposta...</span>
               </div>
             </div>
           )}
@@ -218,7 +241,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <input 
               type="text" 
               className="flex-1 border-2 border-gray-100 bg-gray-50 rounded-[2.5rem] p-6 focus:outline-none focus:ring-8 focus:ring-legal-50 focus:border-legal-200 transition-all text-lg font-bold placeholder:text-gray-300" 
-              placeholder="Pergunta sobre o entendimento jurídico da sua base..." 
+              placeholder="Pergunta sobre um processo ou tema jurídico..." 
               value={input} 
               onChange={e => setInput(e.target.value)} 
               onKeyDown={e => e.key === 'Enter' && handleSend()} 
@@ -227,7 +250,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <button 
               onClick={handleSend} 
               disabled={loading || !input.trim()} 
-              className="bg-legal-900 text-white p-6 rounded-full shadow-2xl hover:bg-black hover:scale-105 active:scale-95 transition-all disabled:opacity-30"
+              className="bg-legal-900 text-white p-6 rounded-full shadow-2xl hover:bg-black hover:scale-105 transition-all disabled:opacity-30"
             >
               <Send className="w-6 h-6" />
             </button>
