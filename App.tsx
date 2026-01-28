@@ -301,7 +301,7 @@ function App() {
   const [legalArea, setLegalArea] = useState<'social' | 'crime' | 'civil' | null>(null);
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
   
-  // File Handles e Cache
+  // File Cache em memória usando o caminho relativo para unicidade
   const [folderName, setFolderName] = useState<string | null>(null);
   const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
   
@@ -360,9 +360,9 @@ function App() {
   const handleAddAcordaos = (incoming: Acordao[]) => {
     setDb(currentDb => {
         const dbMap = new Map<string, Acordao>();
-        currentDb.forEach(a => dbMap.set(a.processo.toLowerCase().trim(), a));
+        currentDb.forEach(a => dbMap.set(a.filePath.toLowerCase().trim(), a));
         incoming.forEach(newA => {
-            const procKey = newA.processo.toLowerCase().trim();
+            const procKey = newA.filePath.toLowerCase().trim();
             if (!dbMap.has(procKey)) dbMap.set(procKey, newA);
         });
         return Array.from(dbMap.values());
@@ -376,34 +376,35 @@ function App() {
     const newCache = new Map<string, File>();
     const pdfs: File[] = [];
     
-    // Obter o nome da pasta mãe a partir do caminho do primeiro ficheiro
-    if (files[0].webkitRelativePath) {
-      const parts = files[0].webkitRelativePath.split('/');
-      if (parts.length > 0) setFolderName(parts[0]);
+    // Extrair nome da pasta principal
+    const firstPath = files[0].webkitRelativePath;
+    if (firstPath) {
+      setFolderName(firstPath.split('/')[0]);
     }
 
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.toLowerCase().endsWith('.pdf')) {
         pdfs.push(f);
-        newCache.set(f.name, f);
+        // Usamos o webkitRelativePath como chave única para evitar colisões
+        newCache.set(f.webkitRelativePath, f);
       }
     }
     
     setFileCache(newCache);
-    alert(`${pdfs.length} ficheiros PDF localizados na estrutura de pastas.`);
+    alert(`${pdfs.length} ficheiros PDF carregados para análise.`);
   };
 
-  const openPdf = async (fileName: string) => {
-    const file = fileCache.get(fileName);
+  const openPdf = async (filePath: string) => {
+    const file = fileCache.get(filePath);
     if (!file) {
-      alert(`⚠️ O ficheiro "${fileName}" não está no cache da sessão.\n\nPor favor, volte ao ecrã de 'Configuração de Sessão' e aponte novamente para a pasta mãe para restaurar o acesso aos ficheiros.`);
+      alert(`⚠️ O ficheiro original não está no cache desta sessão.\n\nPor favor, volte ao ecrã de 'Configuração' e aponte para a pasta mãe novamente para restaurar o acesso.`);
       return;
     }
 
     const win = window.open('about:blank', '_blank');
     if (!win) {
-      alert("O navegador bloqueou a abertura do PDF. Por favor, permita pop-ups para esta aplicação.");
+      alert("Navegador bloqueou o pop-up. Permita pop-ups para ver o PDF.");
       return;
     }
     
@@ -436,7 +437,14 @@ function App() {
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
-        if (parsed.db) handleAddAcordaos(parsed.db);
+        if (parsed.db) {
+          // Normalizar DBs antigos que não tenham filePath
+          const normalized = parsed.db.map((a: any) => ({
+             ...a,
+             filePath: a.filePath || a.fileName
+          }));
+          handleAddAcordaos(normalized);
+        }
         if (parsed.descriptors) {
             const merged = { ...descriptors };
             if (parsed.descriptors.social) merged.social = Array.from(new Set([...descriptors.social, ...parsed.descriptors.social])).sort();
@@ -445,7 +453,7 @@ function App() {
             setDescriptors(merged);
         }
       } catch (err) {
-        alert("Erro ao ler ficheiro de base de dados.");
+        alert("Erro ao ler backup.");
       }
     };
     reader.readAsText(file);
@@ -461,10 +469,10 @@ function App() {
         const parsed = JSON.parse(ev.target?.result as string);
         if (parsed.chatSessions) {
             setChatSessions(parsed.chatSessions);
-            alert("Sessões de chat carregadas.");
+            alert("Histórico carregado.");
         }
       } catch (err) {
-        alert("Erro ao ler histórico de chats.");
+        alert("Erro ao ler histórico.");
       }
     };
     reader.readAsText(file);
@@ -493,8 +501,8 @@ function App() {
                 </button>
             </div>
 
-            <button onClick={() => setOnboardingStep('setup')} className="p-2.5 text-legal-300 hover:text-white transition-all bg-legal-800/20 rounded-xl border border-legal-700 ml-1" title="Sair / Reconfigurar">
-                <X className="w-4 h-4" />
+            <button onClick={() => setOnboardingStep('setup')} className="p-2.5 text-legal-300 hover:text-white transition-all bg-legal-800/20 rounded-xl border border-legal-700 ml-1" title="Configurações">
+                <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -183,26 +183,31 @@ const ProcessingModule: React.FC<Props> = ({
 
   const processFileList = async (files: File[]) => {
     setProcessing(true);
-    setLogs(prev => [`Analisando ${files.length} ficheiros PDF...`]);
     stopRequested.current = false;
     
-    const existingFileNames = new Set(existingDB.map(a => a.fileName));
-    const newFiles = files.filter(f => !existingFileNames.has(f.name));
+    // Lógica incremental: filtrar ficheiros cujo filePath ou fileName já existe na DB
+    const existingKeys = new Set(existingDB.map(a => a.filePath.toLowerCase()));
+    const newFiles = files.filter(f => !existingKeys.has(f.webkitRelativePath.toLowerCase()));
 
     if (newFiles.length === 0) {
-      setLogs(prev => [...prev, 'Nenhum acórdão novo encontrado para processar.']);
+      setLogs(prev => [...prev, 'Biblioteca já se encontra sincronizada com a pasta selecionada.']);
       setProcessing(false);
       return;
     }
+
+    setLogs(prev => [...prev, `Detetados ${newFiles.length} acórdãos novos. A iniciar extração...`]);
 
     const newData: Acordao[] = [];
     for (let i = 0; i < newFiles.length; i++) {
       if (stopRequested.current) break;
       const file = newFiles[i];
       try {
-        setLogs(prev => [...prev, `Extraindo: ${file.name}`]);
+        setLogs(prev => [...prev, `[${i+1}/${newFiles.length}] A analisar: ${file.name}`]);
         let data = await extractDataFromPdf(file);
         
+        // Atribuir o caminho relativo para garantir que a anti-duplicação funciona em subpastas
+        data.filePath = file.webkitRelativePath;
+
         if (data.sumario.includes('Sumário não encontrado')) {
             const aiResult = await extractMetadataWithAI(data.textoAnalise, availableDescriptors || []);
             if (aiResult) {
@@ -212,17 +217,17 @@ const ProcessingModule: React.FC<Props> = ({
         }
         newData.push(data);
       } catch (err) {
-        setLogs(prev => [...prev, `Erro no ficheiro: ${file.name}`]);
+        setLogs(prev => [...prev, `⚠️ Falha no ficheiro: ${file.name}`]);
       }
     }
     onDataLoaded(newData);
     setProcessing(false);
-    setLogs(prev => [...prev, `Processamento finalizado. ${newData.length} novos acórdãos na biblioteca.`]);
+    setLogs(prev => [...prev, `✅ Sincronização concluída. ${newData.length} novos documentos adicionados.`]);
   };
 
   const handleSyncClick = () => {
-    if (filesFromFolder.length === 0) {
-        alert("A pasta mãe ainda não foi indicada no ecrã inicial ou está vazia.");
+    if (!filesFromFolder || filesFromFolder.length === 0) {
+        alert("A pasta mãe ainda não foi selecionada no ecrã de Configuração.");
         return;
     }
     processFileList(filesFromFolder);
@@ -235,6 +240,7 @@ const ProcessingModule: React.FC<Props> = ({
            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-6">
               <div className="w-16 h-16 border-4 border-legal-100 border-t-legal-600 rounded-full animate-spin"></div>
               <h3 className="text-xl font-black uppercase tracking-tighter">Sincronizando Biblioteca</h3>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">A tratar apenas os ficheiros novos...</p>
               <button onClick={() => stopRequested.current = true} className="bg-red-600 text-white px-8 py-3 rounded-2xl font-black text-[10px] uppercase">Cancelar</button>
            </div>
         </div>
@@ -289,25 +295,28 @@ const ProcessingModule: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 col-span-2">
             <h2 className="text-2xl font-black text-legal-900 mb-6 flex items-center gap-3 uppercase tracking-tighter">
-              <FolderUp className="w-7 h-7 text-legal-600" /> Sincronização Local
+              <FolderUp className="w-7 h-7 text-legal-600" /> Sincronização Incremental
             </h2>
             <div className="flex flex-col gap-4">
               <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
-                Pasta ativa: <span className="text-legal-900">{rootHandleName || 'Nenhuma'}</span>
+                Pasta ativa: <span className="text-legal-900">{rootHandleName || 'Nenhuma selecionada'}</span>
               </p>
-              <button onClick={handleSyncClick} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest w-fit">
-                  <Loader2 className={`w-5 h-5 ${processing ? 'animate-spin' : ''}`}/> {processing ? 'Processando...' : 'Sincronizar Novos Ficheiros'}
-              </button>
+              <div className="flex gap-4">
+                <button onClick={handleSyncClick} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest w-fit">
+                    <Loader2 className={`w-5 h-5 ${processing ? 'animate-spin' : ''}`}/> {processing ? 'Processando...' : 'Sincronizar Novos Acórdãos'}
+                </button>
+              </div>
+              <p className="text-[10px] text-gray-400 italic">A app deteta ficheiros novos automaticamente e salta os que já estão na biblioteca.</p>
             </div>
           </div>
 
           <div className="bg-legal-900 p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col justify-center gap-4">
               <div className="flex items-center justify-between border-b border-legal-800 pb-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Bibliotecados</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Na Biblioteca</span>
                 <span className="text-2xl font-black">{existingDB.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Na Pasta Mãe</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Total na Pasta</span>
                 <span className="text-2xl font-black text-blue-400">{filesFromFolder.length}</span>
               </div>
           </div>

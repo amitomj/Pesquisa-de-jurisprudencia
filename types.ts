@@ -10,6 +10,7 @@ export interface Acordao {
   textoAnalise: string;
   textoCompleto: string;
   fileName: string;
+  filePath: string; // Caminho relativo para distinguir ficheiros com nomes iguais em subpastas
   tipoDecisao: 'Acórdão' | 'Decisão Sumária';
   // Segmentação Estrutural
   relatorio: string;
@@ -61,7 +62,6 @@ declare global {
 
   interface Window {
     pdfjsLib: any;
-    showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>;
     aistudio?: AIStudio;
   }
 }

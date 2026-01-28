@@ -25,19 +25,11 @@ const cleanLegalPageText = (text: string): string => {
     /^[\d\s]*$/                                  // Linhas só com números ou espaços
   ];
 
-  // Filtra linhas que correspondem a padrões de ruído
-  // E remove linhas muito curtas no início/fim de cada página que pareçam notas órfãs
   const cleanedLines = lines.filter((line, index) => {
     const trimmed = line.trim();
     if (!trimmed) return false;
-    
-    // Se a linha corresponder a um padrão de ruído conhecido
     if (noisyPatterns.some(p => p.test(trimmed))) return false;
-
-    // Se for uma nota de rodapé (começa com número pequeno isolado)
-    // Normalmente notas de rodapé em acórdãos são descartáveis para o sumário literal
     if (/^\s*\[?\d+\]?\s+[A-Z]/.test(trimmed) && index > lines.length - 5) return false;
-
     return true;
   });
 
@@ -83,15 +75,11 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
     const textContent = await page.getTextContent();
     // @ts-ignore
     const strings = textContent.items.map((item: any) => item.str);
-    
-    // Limpamos cada página individualmente antes de juntar
     const pageRawText = strings.join('\n');
     pagesText.push(cleanLegalPageText(pageRawText));
   }
 
-  // Juntamos com quebra de linha mas o cleanLegalPageText já removeu o lixo entre as páginas
   const fullText = pagesText.join('\n');
-  
   const firstThree = pagesText.slice(0, 3).join('\n');
   const lastThree = pagesText.slice(Math.max(0, numPages - 3)).join('\n');
   const contextForSummary = `[INÍCIO DO DOCUMENTO]\n${firstThree}\n\n[FIM DO DOCUMENTO]\n${lastThree}`;
@@ -101,7 +89,6 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   let adjuntos: string[] = [];
   let tipoDecisao: 'Acórdão' | 'Decisão Sumária' = 'Acórdão';
 
-  // O texto completo já está limpo, o que melhora a precisão do regex
   const signatureRegex = /Assinado em\s+(\d{2}-\d{2}-\d{4}),\s*por\s*([^\n,]+)/gi;
   const matches = [...fullText.matchAll(signatureRegex)];
   if (matches.length > 0) {
@@ -121,19 +108,18 @@ export const extractDataFromPdf = async (file: File): Promise<Acordao> => {
   const factosNaoProvadosMatch = fullText.match(/(?:Factos\s+não\s+Provados)([\s\S]*?)(?=(?:III\.\s*|O\s+Direito|Fundamentação\s+de\s+Direito))/i);
   const direitoMatch = fullText.match(/(?:Fundamentação\s+de\s+Direito|O\s+Direito|III\.\s*Direito)([\s\S]*?)(?=(?:IV\.\s*|Decisão|Conclusão|$))/i);
 
-  // EXTRAÇÃO DO SUMÁRIO
   let sumario = 'Sumário não encontrado';
   const sumarioRegex = /(?:Sumário|SUMÁRIO)(?:\s+da\s+responsabilidade\s+do\s+relator)?[:\s\n]+([\s\S]*?)(?=(?:\n\s*[I1]\s*[\)\.]|Decisão|DECISÃO|Acordam|ACORDAM|Relatório|Fundamentação|Custas|Dispositivo|$))/i;
   
   const sumarioMatch = contextForSummary.match(sumarioRegex);
   if (sumarioMatch && sumarioMatch[1].trim().length > 10) {
-    // Limpeza final para remover excesso de quebras de linha que sobraram da limpeza de página
     sumario = sumarioMatch[1].trim().replace(/\n{3,}/g, '\n\n');
   }
 
   return {
     id: crypto.randomUUID(),
     fileName: file.name,
+    filePath: file.webkitRelativePath || file.name, // Importante para anti-duplicação
     processo: cleanText(processo),
     relator: cleanText(relator),
     adjuntos: adjuntos,

@@ -11,10 +11,9 @@ interface Props {
   sessions: ChatSession[];
   onSaveSession: (session: ChatSession) => void;
   onDeleteSession: (id: string) => void;
-  onOpenPdf: (fileName: string) => void;
+  onOpenPdf: (filePath: string) => void;
 }
 
-// Função para normalizar números de processo (remove pontos, barras, traços)
 const canonicalizeProcesso = (p: string) => p.replace(/[\.\/\-\s]/g, '').toLowerCase();
 
 const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf }) => {
@@ -55,29 +54,18 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
     setLoading(true);
 
     try {
-      // Normalização para pesquisa geral
       const userInputLower = userInput.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      
-      // Extração de tokens: Mantemos palavras > 3 letras OU qualquer token que contenha números (provável processo)
       const keywords = userInputLower.split(/[\s,.;]+/).filter(w => w.length > 3 || /\d/.test(w));
-      
-      // Versão "limpa" da pergunta para encontrar processos
       const canonicalInput = canonicalizeProcesso(userInput);
 
-      // PESQUISA EM TODA A BASE DE DADOS (DB)
       const relevantContext = db.filter(d => {
         const searchableText = `${d.sumario} ${d.fundamentacaoDireito} ${d.processo} ${d.relator}`.toLowerCase()
            .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
         const canonicalProc = canonicalizeProcesso(d.processo);
-
-        // Correspondência por Número de Processo Canónico (Alta Prioridade)
         if (canonicalInput.includes(canonicalProc) && canonicalProc.length > 3) return true;
-
-        // Correspondência por Keywords
         return keywords.length > 0 && keywords.some(k => searchableText.includes(k) || canonicalProc.includes(canonicalizeProcesso(k)));
       })
-      // Ordenação: Documentos cujo número de processo aparece na pergunta sobem para o topo
       .sort((a, b) => {
           const aInInput = canonicalInput.includes(canonicalizeProcesso(a.processo));
           const bInInput = canonicalInput.includes(canonicalizeProcesso(b.processo));
@@ -94,7 +82,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         const botMsg: ChatMessage = { 
           id: crypto.randomUUID(), 
           role: 'model', 
-          content: "Lamento, mas não consegui encontrar na sua base de dados o processo mencionado ou documentos relevantes para a sua questão. Certifique-se de que o documento foi corretamente processado no separador 'Processamento'.", 
+          content: "Lamento, mas não consegui encontrar na sua biblioteca o processo mencionado ou documentos relevantes para este tema. Verifique se os documentos estão carregados no separador 'Processamento'.", 
           timestamp: Date.now() 
         };
         const finalSession = { ...session, messages: [...updatedMessages, botMsg] };
@@ -111,8 +99,8 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
       setCurrentSession(finalSession);
       onSaveSession(finalSession);
     } catch (e) {
-      console.error("Erro no fluxo do Chat:", e);
-      alert("Ocorreu um erro ao processar a sua consulta.");
+      console.error("Erro no Chat:", e);
+      alert("Erro ao processar consulta.");
     } finally { setLoading(false); }
   };
 
@@ -133,7 +121,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             const id = match[1];
             const doc = sources.find(s => s.id === id);
             if (doc) return (
-              <button key={i} onClick={() => onOpenPdf(doc.fileName)} className="mx-1 inline-flex items-center gap-1 px-2 py-0.5 bg-legal-100 text-legal-800 rounded-lg text-[10px] font-black uppercase border border-legal-200 hover:bg-legal-200 transition-all shadow-sm">
+              <button key={i} onClick={() => onOpenPdf(doc.filePath)} className="mx-1 inline-flex items-center gap-1 px-2 py-0.5 bg-legal-100 text-legal-800 rounded-lg text-[10px] font-black uppercase border border-legal-200 hover:bg-legal-200 transition-all shadow-sm">
                 <FileText className="w-3 h-3" /> {doc.processo}
               </button>
             );
@@ -188,7 +176,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
           {!currentSession ? (
              <div className="h-full flex flex-col items-center justify-center text-gray-300 uppercase font-black tracking-widest text-xs gap-4">
                <Scale className="w-20 h-20 opacity-10"/> 
-               Selecione ou inicie uma nova consulta baseada na sua biblioteca
+               Selecione ou inicie uma consulta baseada na sua biblioteca
              </div>
           ) : (
              currentSession.messages.map(msg => {
@@ -206,7 +194,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
                                 <h4 className="text-[10px] font-black text-legal-900 uppercase tracking-[0.4em] mb-6 flex items-center gap-2 opacity-60"><Library className="w-4 h-4" /> Jurisprudência de Suporte</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {citedDocs.map(src => (
-                                        <button key={src.id} onClick={() => onOpenPdf(src.fileName)} className="text-left bg-gray-50 border border-gray-100 p-6 rounded-[2rem] hover:bg-legal-900 hover:text-white transition-all shadow-sm flex items-start gap-4 group">
+                                        <button key={src.id} onClick={() => onOpenPdf(src.filePath)} className="text-left bg-gray-50 border border-gray-100 p-6 rounded-[2rem] hover:bg-legal-900 hover:text-white transition-all shadow-sm flex items-start gap-4 group">
                                             <FileText className="w-5 h-5 flex-shrink-0 opacity-40 group-hover:text-white"/>
                                             <div className="flex-1 min-w-0">
                                                 <div className="text-[11px] font-black uppercase truncate mb-1">{src.processo}</div>
@@ -226,7 +214,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
             <div className="flex justify-start animate-pulse">
               <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-gray-50 flex items-center gap-4">
                 <Bot className="w-8 h-8 text-legal-600 animate-bounce" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Analisando base de dados e redigindo resposta...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-900">Analisando documentos novos e gerando resposta...</span>
               </div>
             </div>
           )}

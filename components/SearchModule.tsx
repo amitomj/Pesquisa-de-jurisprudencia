@@ -63,7 +63,7 @@ const SidebarAutocomplete: React.FC<{
 
 const SearchModule: React.FC<{
   db: Acordao[];
-  onOpenPdf: (fileName: string) => void;
+  onOpenPdf: (filePath: string) => void;
   onUpdateAcordao: (item: Acordao) => void;
   availableDescriptors: string[];
   availableJudges: string[];
@@ -284,7 +284,7 @@ const SearchModule: React.FC<{
                       {isProcessing?.id === item.id && isProcessing.mode === 'dados' ? <Loader2 className="w-4 h-4 animate-spin"/> : <UserCheck className="w-4 h-4"/>}
                     </button>
                     <button onClick={() => setEditingItem(item)} className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all" title="Editar Manualmente"><Pencil className="w-4 h-4"/></button>
-                    <button onClick={() => onOpenPdf(item.fileName)} className="p-3 bg-legal-900 text-white rounded-2xl shadow-xl hover:bg-black transition-all" title="Ver PDF Original"><FileText className="w-4 h-4"/></button>
+                    <button onClick={() => onOpenPdf(item.filePath)} className="p-3 bg-legal-900 text-white rounded-2xl shadow-xl hover:bg-black transition-all" title="Ver PDF Original"><FileText className="w-4 h-4"/></button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-[1fr,250px] gap-8">
