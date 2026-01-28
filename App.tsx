@@ -27,28 +27,34 @@ function App() {
   const [folderName, setFolderName] = useState<string | null>(null);
   const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
   const [hasApiKey, setHasApiKey] = useState<boolean>(false);
+  const [isIndexing, setIsIndexing] = useState(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'setup' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
 
-  // Monitorizar a chave API de forma contínua
+  // Monitorizar a chave API de forma contínua com fallback para process.env
   useEffect(() => {
-    let interval: any;
     const checkKey = async () => {
+      // Se já temos a chave no ambiente, consideramos ativo
+      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+        setHasApiKey(true);
+        return;
+      }
+
       if (window.aistudio) {
         try {
           const selected = await window.aistudio.hasSelectedApiKey();
           setHasApiKey(selected);
         } catch (e) {
-          console.error("Erro ao verificar API Key", e);
+          console.debug("Aguardando interface AI Studio...");
         }
       }
     };
     
     checkKey();
-    interval = setInterval(checkKey, 3000); // Poll cada 3s para lidar com race conditions
+    const interval = setInterval(checkKey, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -56,12 +62,19 @@ function App() {
     if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
+        // Após abrir, assumimos sucesso conforme as diretrizes
         setHasApiKey(true);
       } catch (e) {
-        alert("Não foi possível abrir o seletor de chaves. Verifique as permissões do browser.");
+        console.error("Erro ao abrir seletor", e);
       }
     } else {
-      alert("Interface AI Studio não detetada. Recarregue a página.");
+      // Se não houver window.aistudio, mas o utilizador clicar, 
+      // verificamos se a chave ambiente existe como fallback
+      if (process.env.API_KEY) {
+        setHasApiKey(true);
+      } else {
+        alert("A interface de seleção de chave não está disponível neste ambiente. Verifique se a API_KEY está configurada nas definições do projeto.");
+      }
     }
   };
 
@@ -114,35 +127,40 @@ function App() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
+    setIsIndexing(true);
     const newCache = new Map<string, File>();
-    const firstPath = files[0].webkitRelativePath;
-    if (firstPath) {
-      setFolderName(firstPath.split('/')[0]);
-    } else {
-      setFolderName("Pasta Local");
-    }
+    const firstFile = files[0];
+    const pathParts = firstFile.webkitRelativePath.split('/');
+    setFolderName(pathParts.length > 1 ? pathParts[0] : "Biblioteca Local");
 
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.toLowerCase().endsWith('.pdf')) {
-        // Guardamos por caminho completo E por nome para facilitar recuperação
-        if (f.webkitRelativePath) newCache.set(f.webkitRelativePath.toLowerCase(), f);
+        // Indexamos por caminho relativo (se existir) e por nome do ficheiro (fallback)
+        if (f.webkitRelativePath) {
+          newCache.set(f.webkitRelativePath.toLowerCase(), f);
+        }
         newCache.set(f.name.toLowerCase(), f);
       }
     }
     
-    setFileCache(new Map(newCache)); // Forçar nova instância para Trigger do React
-    console.log(`Cache atualizado: ${newCache.size} entradas.`);
+    setFileCache(newCache);
+    setIsIndexing(false);
   };
 
   const openPdf = async (filePath: string) => {
+    if (fileCache.size === 0) {
+      alert("⚠️ Acesso aos PDFs não configurado. Por favor, selecione a pasta dos acórdãos no ecrã de Configuração.");
+      return;
+    }
+
     const pathLower = filePath.toLowerCase();
     const fileName = (filePath.split('/').pop() || filePath).toLowerCase();
     
     const file = fileCache.get(pathLower) || fileCache.get(fileName);
     
     if (!file) {
-      alert(`⚠️ Ficheiro "${fileName}" não encontrado.\n\nPara visualizar PDFs, deve selecionar a pasta que contém os documentos no ecrã de Configuração.`);
+      alert(`⚠️ Ficheiro "${fileName}" não encontrado na pasta selecionada.\n\nVerifique se selecionou a pasta correta que contém os PDFs.`);
       return;
     }
     
@@ -263,18 +281,18 @@ function App() {
                         {hasApiKey && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                     </div>
                     <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">1. Chave Gemini API</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">Essencial para inteligência e chat.</p>
-                    <button onClick={handleOpenKeySelector} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase transition-all ${hasApiKey ? 'bg-green-600 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg'}`}>
-                        {hasApiKey ? 'Alterar Chave' : 'Ativar API Gemini'}
+                    <p className="text-slate-400 text-[10px] mb-4">Indispensável para extração e chat.</p>
+                    <button onClick={handleOpenKeySelector} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase transition-all ${hasApiKey ? 'bg-green-600 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'}`}>
+                        {hasApiKey ? 'Chave Ativada' : 'Ativar API Gemini'}
                     </button>
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="block text-center mt-3 text-[9px] font-black text-blue-400 uppercase hover:underline flex items-center justify-center gap-1">Preçário API <ExternalLink className="w-2.5 h-2.5"/></a>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="block text-center mt-3 text-[9px] font-black text-blue-400 uppercase hover:underline flex items-center justify-center gap-1">Info Preçário <ExternalLink className="w-2.5 h-2.5"/></a>
                 </div>
 
                 {/* Passo 2: Metadados */}
                 <div className={`p-6 rounded-[28px] border-2 transition-all ${db.length > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-slate-700 bg-slate-800/30'}`}>
                     <Database className={`w-6 h-6 mb-4 ${db.length > 0 ? 'text-green-500' : 'text-slate-400'}`} />
                     <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">2. Base de Dados</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos prontos.` : 'Opcional: carregar JSON.'}</p>
+                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos lidos.` : 'Opcional: carregar JSON.'}</p>
                     <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-600">Carregar JSON</button>
                 </div>
 
@@ -283,19 +301,20 @@ function App() {
                     <div className="flex items-center gap-4 mb-4">
                         <FolderOpen className={`w-8 h-8 ${fileCache.size > 0 ? 'text-green-500' : 'text-orange-500'}`} />
                         <div className="flex-1">
-                            <h3 className="text-white font-black text-[11px] uppercase tracking-widest">3. Acesso aos Documentos (PDFs)</h3>
-                            <p className="text-slate-400 text-[10px]">{fileCache.size > 0 ? `Pasta conectada (${fileCache.size} ficheiros indexados).` : 'Selecione a pasta original para poder abrir os PDFs.'}</p>
+                            <h3 className="text-white font-black text-[11px] uppercase tracking-widest">3. Acesso aos PDFs</h3>
+                            <p className="text-slate-400 text-[10px]">{fileCache.size > 0 ? `${fileCache.size} PDFs indexados.` : 'Selecione a pasta para poder abrir os documentos.'}</p>
                         </div>
                         {fileCache.size > 0 && <CheckCircle2 className="w-6 h-6 text-green-500" />}
+                        {isIndexing && <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />}
                     </div>
-                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-xl">Selecionar Pasta Mãe</button>
+                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-xl shadow-orange-900/20">Selecionar Pasta Mãe</button>
                 </div>
             </div>
 
             <button 
                 onClick={() => setOnboardingStep('app')}
-                disabled={!hasApiKey}
                 className={`w-full py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-3 ${hasApiKey ? 'bg-blue-600 text-white hover:scale-[1.01] active:scale-95' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}
+                disabled={!hasApiKey}
             >
                 {hasApiKey ? <><PlayCircle className="w-6 h-6" /> Iniciar Aplicação</> : "Ative a API para continuar"}
             </button>
@@ -321,7 +340,15 @@ function App() {
               reader.readAsText(file);
           }
       }} />
-      <input type="file" ref={directoryInputRef} className="hidden" webkitdirectory="true" directory="true" multiple onChange={handleDirectorySelect} />
+      <input 
+        type="file" 
+        ref={directoryInputRef} 
+        className="hidden" 
+        webkitdirectory="true" 
+        directory="true" 
+        multiple 
+        onChange={handleDirectorySelect} 
+      />
     </>
   );
 }
