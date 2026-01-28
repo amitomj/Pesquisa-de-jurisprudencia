@@ -21,16 +21,6 @@ import {
   Loader2
 } from 'lucide-react';
 
-// Inicialização imediata do shim de process.env para o browser/Vercel
-if (typeof window !== 'undefined') {
-  (window as any).process = (window as any).process || {};
-  (window as any).process.env = (window as any).process.env || {};
-  // Recupera do localStorage se já existir para evitar erro de inicialização
-  if (!(window as any).process.env.API_KEY) {
-    (window as any).process.env.API_KEY = localStorage.getItem('gemini_api_key') || '';
-  }
-}
-
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Acidente de trabalho", "Assédio", "Caducidade", "Categoria profissional", "Contrato de trabalho",
   "Despedimento", "Despedimento ilícito", "Direito a férias", "Doença profissional", "Faltas injustificadas", "Greve",
@@ -59,7 +49,7 @@ function App() {
   const chatInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
 
-  // Sincroniza a chave manual com o objeto global exigido pelo SDK
+  // Sincroniza a chave manual com o objeto global e localStorage
   useEffect(() => {
     if (manualKey) {
       localStorage.setItem('gemini_api_key', manualKey);
@@ -117,13 +107,10 @@ function App() {
   const handleDirectorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
     setIsIndexing(true);
     const newCache = new Map<string, File>();
     const firstFile = files[0];
-    
     setFolderName(firstFile.webkitRelativePath ? firstFile.webkitRelativePath.split('/')[0] : "Biblioteca Local");
-
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.toLowerCase().endsWith('.pdf')) {
@@ -131,7 +118,6 @@ function App() {
         newCache.set(f.name.toLowerCase(), f);
       }
     }
-    
     setFileCache(newCache);
     setIsIndexing(false);
   };
@@ -139,7 +125,6 @@ function App() {
   const openPdf = async (filePath: string) => {
     const fileName = (filePath.split('/').pop() || filePath).toLowerCase();
     const file = fileCache.get(filePath.toLowerCase()) || fileCache.get(fileName);
-    
     if (!file) {
       alert(`⚠️ Ficheiro "${fileName}" não encontrado localmente.`);
       return;
@@ -194,7 +179,6 @@ function App() {
           </div>
         </div>
       </header>
-
       <div className="flex-1 overflow-hidden flex flex-col">
         <div className="bg-white border-b px-8 pt-4 flex gap-8 flex-shrink-0 shadow-sm z-10">
             {['process', 'search', 'chat'].map((tab: any) => (
@@ -220,17 +204,13 @@ function App() {
     <div className="fixed inset-0 bg-[#020617] z-[100] flex items-center justify-center p-6 font-sans overflow-hidden">
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full"></div>
-
       {onboardingStep === 'area' ? (
         <div className="max-w-[1000px] w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-700">
             <div className="mb-12 flex flex-col items-center">
-                <div className="p-8 bg-blue-600/10 rounded-full border border-blue-500/20 mb-8 shadow-2xl shadow-blue-500/10">
-                    <Database className="w-16 h-16 text-blue-500" />
-                </div>
+                <div className="p-8 bg-blue-600/10 rounded-full border border-blue-500/20 mb-8 shadow-2xl shadow-blue-500/10"><Database className="w-16 h-16 text-blue-500" /></div>
                 <h1 className="text-6xl font-black text-white tracking-tighter uppercase mb-2">VERITAS FORENSE V2</h1>
                 <p className="text-slate-400 font-bold uppercase tracking-[0.3em] text-sm">Sistema de Transcrição e Análise Jurídica Profissional</p>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl">
               {['social', 'crime', 'civil'].map((area: any) => (
                 <button key={area} onClick={() => selectLegalArea(area)} className="group p-8 rounded-[32px] border border-slate-800 bg-slate-900/40 hover:border-blue-500/50 hover:bg-slate-800 transition-all flex flex-col items-center text-center gap-6 active:scale-95">
@@ -248,77 +228,34 @@ function App() {
       ) : (
         <div className="bg-[#0f172a]/80 backdrop-blur-xl rounded-[48px] shadow-2xl p-16 max-w-[700px] w-full border border-slate-800/50 relative overflow-hidden animate-in slide-in-from-bottom-10 duration-500 flex flex-col items-center">
             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
-            
             <div className="mb-12 flex flex-col items-center">
-                <div className="p-6 bg-blue-600 rounded-full mb-8 shadow-2xl shadow-blue-600/40">
-                    <Database className="w-12 h-12 text-white" />
-                </div>
+                <div className="p-6 bg-blue-600 rounded-full mb-8 shadow-2xl shadow-blue-600/40"><Database className="w-12 h-12 text-white" /></div>
                 <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-2">VERITAS FORENSE V2</h2>
                 <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.4em]">Configuração Geral</p>
             </div>
-
             <div className="w-full space-y-8 mb-12">
                 <div className="relative group">
-                    <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                        <Key className="w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
-                    </div>
-                    <input 
-                        type="password"
-                        placeholder="Insira a sua Gemini API Key..."
-                        className="w-full bg-[#0a0f1e] border border-slate-800 rounded-[24px] py-6 pl-16 pr-6 text-white text-lg font-bold placeholder:text-slate-600 focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all shadow-inner"
-                        value={manualKey}
-                        onChange={(e) => setManualKey(e.target.value)}
-                    />
+                    <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none"><Key className="w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" /></div>
+                    <input type="password" placeholder="Insira a sua Gemini API Key..." className="w-full bg-[#0a0f1e] border border-slate-800 rounded-[24px] py-6 pl-16 pr-6 text-white text-lg font-bold placeholder:text-slate-600 focus:outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all shadow-inner" value={manualKey} onChange={(e) => setManualKey(e.target.value)} />
                 </div>
-
                 <div className="grid grid-cols-2 gap-6">
-                    <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex flex-col items-center gap-4 p-8 bg-[#0a0f1e] border border-slate-800 rounded-[32px] hover:bg-slate-800 transition-all group active:scale-95"
-                    >
-                        <div className="p-4 bg-green-500/10 rounded-2xl group-hover:bg-green-500/20">
-                            <FileJson className="w-8 h-8 text-green-500" />
-                        </div>
-                        <div className="text-center">
-                            <div className="text-white font-black text-sm uppercase tracking-tighter">PROJETO</div>
-                            <div className="text-slate-500 text-[9px] font-black uppercase tracking-widest mt-1">Restaurar Estado</div>
-                        </div>
-                        {db.length > 0 && <div className="bg-green-500 text-[8px] text-white px-2 py-0.5 rounded-full font-black">{db.length} ACÓRDÃOS</div>}
+                    <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center gap-4 p-8 bg-[#0a0f1e] border border-slate-800 rounded-[32px] hover:bg-slate-800 transition-all group active:scale-95">
+                        <div className="p-4 bg-green-500/10 rounded-2xl group-hover:bg-green-500/20"><FileJson className="w-8 h-8 text-green-500" /></div>
+                        <div className="text-center"><div className="text-white font-black text-sm uppercase tracking-tighter">PROJETO</div><div className="text-slate-500 text-[9px] font-black uppercase tracking-widest mt-1">Restaurar Estado</div></div>
                     </button>
-
-                    <button 
-                        onClick={() => directoryInputRef.current?.click()}
-                        className="flex flex-col items-center gap-4 p-8 bg-[#0a0f1e] border border-slate-800 rounded-[32px] hover:bg-slate-800 transition-all group active:scale-95"
-                    >
-                        <div className="p-4 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500/20">
-                            <FolderOpen className="w-8 h-8 text-blue-500" />
-                        </div>
-                        <div className="text-center">
-                            <div className="text-white font-black text-sm uppercase tracking-tighter">BASE DADOS</div>
-                            <div className="text-slate-500 text-[9px] font-black uppercase tracking-widest mt-1">Sincronizar PDFs</div>
-                        </div>
-                        {fileCache.size > 0 && <div className="bg-blue-500 text-[8px] text-white px-2 py-0.5 rounded-full font-black">{fileCache.size} FICHEIROS</div>}
-                        {isIndexing && <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />}
+                    <button onClick={() => directoryInputRef.current?.click()} className="flex flex-col items-center gap-4 p-8 bg-[#0a0f1e] border border-slate-800 rounded-[32px] hover:bg-slate-800 transition-all group active:scale-95">
+                        <div className="p-4 bg-blue-500/10 rounded-2xl group-hover:bg-blue-500/20"><FolderOpen className="w-8 h-8 text-blue-500" /></div>
+                        <div className="text-center"><div className="text-white font-black text-sm uppercase tracking-tighter">BASE DADOS</div><div className="text-slate-500 text-[9px] font-black uppercase tracking-widest mt-1">Sincronizar PDFs</div></div>
                     </button>
                 </div>
             </div>
-
             <div className="w-full space-y-4">
-                <button 
-                    onClick={() => setOnboardingStep('app')}
-                    disabled={!manualKey && !((window as any).process?.env?.API_KEY)}
-                    className="w-full py-8 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white rounded-[32px] font-black text-xl uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/20 transition-all flex items-center justify-center gap-4 group active:scale-95"
-                >
+                <button onClick={() => setOnboardingStep('app')} disabled={!manualKey} className="w-full py-8 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white rounded-[32px] font-black text-xl uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/20 transition-all flex items-center justify-center gap-4 group active:scale-95">
                     INICIAR APLICAÇÃO <ChevronRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
                 </button>
-                <div className="flex items-center justify-center gap-2 text-slate-500 text-[9px] font-black uppercase tracking-widest">
-                    <ShieldCheck className="w-3.5 h-3.5" /> Encriptação de Sessão Local Ativa
-                </div>
+                <div className="flex items-center justify-center gap-2 text-slate-500 text-[9px] font-black uppercase tracking-widest"><ShieldCheck className="w-3.5 h-3.5" /> Encriptação de Sessão Local Ativa</div>
             </div>
-
-            <button onClick={() => setOnboardingStep('area')} className="absolute top-10 right-10 p-3 text-slate-500 hover:text-white transition-all">
-                <X className="w-8 h-8" />
-            </button>
+            <button onClick={() => setOnboardingStep('area')} className="absolute top-10 right-10 p-3 text-slate-500 hover:text-white transition-all"><X className="w-8 h-8" /></button>
         </div>
       )}
     </div>
@@ -341,15 +278,7 @@ function App() {
               reader.readAsText(file);
           }
       }} />
-      <input 
-        type="file" 
-        ref={directoryInputRef} 
-        className="hidden" 
-        webkitdirectory="true" 
-        directory="true" 
-        multiple 
-        onChange={handleDirectorySelect} 
-      />
+      <input type="file" ref={directoryInputRef} className="hidden" webkitdirectory="true" directory="true" multiple onChange={handleDirectorySelect} />
     </>
   );
 }

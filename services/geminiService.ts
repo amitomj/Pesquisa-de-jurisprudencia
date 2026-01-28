@@ -2,23 +2,35 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Acordao } from "../types";
 
-const handleApiError = async (error: any) => {
-  console.error("Erro Gemini API:", error);
-  const msg = error?.message || "";
-  if (msg.includes("429") || msg.toLowerCase().includes("quota exceeded")) return "API_LIMIT_REACHED";
-  return "ERROR";
+/**
+ * Helper para obter a chave de API de forma resiliente em ambientes como Vercel/Browser.
+ */
+const getApiKey = (): string => {
+  // Tenta ler do process.env (padrão) ou do objeto global (shim do Veritas)
+  const key = process.env.API_KEY || (window as any).process?.env?.API_KEY || localStorage.getItem('gemini_api_key');
+  return key || "";
 };
 
-/**
- * Generates a legal answer using Gemini 3 Pro based on the provided documents.
- * Uses process.env.API_KEY directly as per guidelines.
- */
+const handleApiError = async (error: any) => {
+  console.error("Erro Detalhado Gemini API:", error);
+  const msg = error?.message || "";
+  if (msg.includes("429") || msg.toLowerCase().includes("quota exceeded")) return "API_LIMIT_REACHED";
+  if (msg.includes("API Key not found") || msg.includes("API_KEY_INVALID")) return "INVALID_KEY";
+  return msg || "UNKNOWN_ERROR";
+};
+
 export const generateLegalAnswer = async (
   question: string,
   context: Acordao[]
 ): Promise<string> => {
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    return "ERRO: Chave de API não configurada. Por favor, insira a sua Gemini API Key nas configurações (ícone da engrenagem).";
+  }
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
     const relevantContext = context.map(c => {
       const direito = c.fundamentacaoDireito || "[Fundamentação de Direito não segmentada separadamente]";
@@ -27,7 +39,6 @@ ID_REF: ${c.id}
 Processo: ${c.processo}
 Data: ${c.data}
 Relator: ${c.relator}
-Tribunal: ${c.fileName.toLowerCase().includes('trl') ? 'Relação de Lisboa' : c.fileName.toLowerCase().includes('trp') ? 'Relação do Porto' : c.fileName.toLowerCase().includes('trc') ? 'Relação de Coimbra' : c.fileName.toLowerCase().includes('trg') ? 'Relação de Guimarães' : c.fileName.toLowerCase().includes('tre') ? 'Relação de Évora' : 'Tribunal Superior'}
 
 SUMÁRIO:
 ${c.sumario}
@@ -40,29 +51,12 @@ ${direito.substring(0, 7500)}`;
       model: "gemini-3-pro-preview",
       contents: `Atua como um Consultor Jurídico Sénior. Analisa os acórdãos fornecidos e elabora uma resposta estruturada sobre a questão colocada.
 
-IMPORTANTE: O utilizador pode referir-se a processos específicos (ex: 883/21.0T8VFR.P1). Verifica SEMPRE se algum dos documentos abaixo corresponde ao processo solicitado antes de dizer que não o encontras.
-
-A TUA RESPOSTA DEVE SEGUIR ESTE MODELO RIGOROSO:
-
+A TUA RESPOSTA DEVE SEGUIR ESTE MODELO:
 1. ENQUADRAMENTO INICIAL
-- Descreve brevemente se existe consenso ou divisão na jurisprudência sobre o tema.
-- Se o utilizador perguntou por um processo específico, identifica-o logo aqui.
-
-2. POSIÇÕES JURÍDICAS IDENTIFICADAS (Usa numeração para cada corrente/tese)
-Para cada posição:
-- Define a tese (ex: "Posição favorável a...", "Posição restritiva que defende...").
-- Explica o fundamento jurídico.
-- CITA OS ACÓRDÃOS que sustentam esta posição indicando: Tribunal, Data, Processo e a ID_REF no formato [ID_REF: uuid].
-
+2. POSIÇÕES JURÍDICAS IDENTIFICADAS (Cita IDs no formato [ID_REF: uuid])
 3. NÚCLEO CENTRAL DA DIVERGÊNCIA
-- Identifica o ponto exato onde os tribunais divergem.
-- Menciona princípios interpretativos relevantes.
 
-REGRAS:
-- NUNCA menciones factos concretos dos casos (nomes de arguidos, locais, etc). Foca-te apenas no DIREITO.
-- Usa IDs de referência [ID_REF: uuid] sempre que citar um acórdão.
-
-CONTEXTO DOS ACÓRDÃOS DISPONÍVEIS:
+CONTEXTO:
 ${relevantContext}
 
 QUESTÃO DO UTILIZADOR: 
@@ -73,35 +67,27 @@ ${question}`,
       }
     });
 
-    return response.text || "Não foi possível gerar uma análise jurídica baseada nos documentos fornecidos.";
+    return response.text || "Não foi possível gerar uma análise jurídica.";
   } catch (error: any) {
     const errType = await handleApiError(error);
-    if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de quota da API excedido.";
-    return "Erro técnico na geração da resposta jurídica.";
+    if (errType === "API_LIMIT_REACHED") return "AVISO: Limite de quota excedido.";
+    if (errType === "INVALID_KEY") return "ERRO: Chave de API inválida ou não reconhecida.";
+    return `Erro técnico na API: ${errType}`;
   }
 };
 
-/**
- * Extracts metadata and summary from document text using Gemini 3 Flash.
- * Uses process.env.API_KEY directly as per guidelines.
- */
 export const extractMetadataWithAI = async (textContext: string, availableDescriptors: string[]): Promise<any> => {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
-      contents: `Atua como um extrator de texto literal de acórdãos judiciais. 
+      contents: `Extrai metadados do acórdão em formato JSON. 
+Descritores permitidos: [${availableDescriptors.join(", ")}]
 
-REGRAS CRÍTICAS PARA O SUMÁRIO:
-1. NÃO RESUMAS: O sumário deve ser EXTRAÍDO LITERALMENTE (letra a letra) do texto fornecido.
-2. CONTINUIDADE: Se o sumário estiver dividido por quebras de página, junta o texto de forma contínua.
-3. LIMPEZA ABSOLUTA: Remove/Ignora explicitamente quaisquer números de página (ex: "1/10"), moradas, contactos ou nomes de tribunais que apareçam no meio do texto por causa das quebras de página.
-4. SE NÃO EXISTIR: Se não encontrares um sumário explícito e literal, devolve OBRIGATORIAMENTE a frase: "Sumário não encontrado".
-
-DESCRITORES:
-Escolhe 3-5 descritores da lista oficial que melhor se adequem ao tema: [${availableDescriptors.join(", ")}]
-
-TEXTO DO DOCUMENTO (Segmentos):
+TEXTO:
 ${textContext}`,
       config: {
         responseMimeType: "application/json",
@@ -111,7 +97,7 @@ ${textContext}`,
             data: { type: Type.STRING },
             relator: { type: Type.STRING },
             adjuntos: { type: Type.ARRAY, items: { type: Type.STRING } },
-            sumario: { type: Type.STRING, description: "O sumário literal limpo de lixo de layout." },
+            sumario: { type: Type.STRING },
             descritores: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
           required: ["data", "relator", "adjuntos", "sumario", "descritores"]
@@ -119,5 +105,8 @@ ${textContext}`,
       }
     });
     return response.text ? JSON.parse(response.text) : null;
-  } catch (error) { return null; }
+  } catch (error) { 
+    console.error("Erro na extração AI:", error);
+    return null; 
+  }
 };
