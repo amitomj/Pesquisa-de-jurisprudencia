@@ -17,8 +17,19 @@ import {
   FileJson, 
   FolderOpen,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
+
+// Inicialização imediata do shim de process.env para o browser/Vercel
+if (typeof window !== 'undefined') {
+  (window as any).process = (window as any).process || {};
+  (window as any).process.env = (window as any).process.env || {};
+  // Recupera do localStorage se já existir para evitar erro de inicialização
+  if (!(window as any).process.env.API_KEY) {
+    (window as any).process.env.API_KEY = localStorage.getItem('gemini_api_key') || '';
+  }
+}
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Acidente de trabalho", "Assédio", "Caducidade", "Categoria profissional", "Contrato de trabalho",
@@ -48,16 +59,13 @@ function App() {
   const chatInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
 
-  // Sincronizar chave manual com o processo global para uso no geminiService
+  // Sincroniza a chave manual com o objeto global exigido pelo SDK
   useEffect(() => {
     if (manualKey) {
       localStorage.setItem('gemini_api_key', manualKey);
-      // @ts-ignore
-      window.process = window.process || {};
-      // @ts-ignore
-      window.process.env = window.process.env || {};
-      // @ts-ignore
-      window.process.env.API_KEY = manualKey;
+      if ((window as any).process && (window as any).process.env) {
+        (window as any).process.env.API_KEY = manualKey;
+      }
     }
   }, [manualKey]);
 
@@ -210,7 +218,6 @@ function App() {
     </div>
   ) : (
     <div className="fixed inset-0 bg-[#020617] z-[100] flex items-center justify-center p-6 font-sans overflow-hidden">
-      {/* Background Decorativo */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-900/10 blur-[120px] rounded-full"></div>
 
@@ -251,7 +258,6 @@ function App() {
             </div>
 
             <div className="w-full space-y-8 mb-12">
-                {/* Input Estilo Veritas */}
                 <div className="relative group">
                     <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
                         <Key className="w-5 h-5 text-slate-500 group-focus-within:text-blue-500 transition-colors" />
@@ -265,7 +271,6 @@ function App() {
                     />
                 </div>
 
-                {/* Grid de Ações Secundárias */}
                 <div className="grid grid-cols-2 gap-6">
                     <button 
                         onClick={() => fileInputRef.current?.click()}
@@ -301,7 +306,7 @@ function App() {
             <div className="w-full space-y-4">
                 <button 
                     onClick={() => setOnboardingStep('app')}
-                    disabled={!manualKey && !process.env.API_KEY}
+                    disabled={!manualKey && !((window as any).process?.env?.API_KEY)}
                     className="w-full py-8 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-600 disabled:cursor-not-allowed text-white rounded-[32px] font-black text-xl uppercase tracking-[0.2em] shadow-2xl shadow-blue-600/20 transition-all flex items-center justify-center gap-4 group active:scale-95"
                 >
                     INICIAR APLICAÇÃO <ChevronRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
@@ -348,10 +353,5 @@ function App() {
     </>
   );
 }
-
-// Helper local para evitar erros de Loader2 não importado se esquecido
-const Loader2 = ({className}: {className?: string}) => (
-    <div className={`border-2 border-current border-t-transparent rounded-full animate-spin ${className}`}></div>
-);
 
 export default App;
