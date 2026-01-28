@@ -3,7 +3,11 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, X, ChevronDown, ArrowRight, AlertTriangle } from 'lucide-react';
+import { 
+  FolderUp, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, 
+  UserCheck, X, ChevronDown, ArrowRight, AlertTriangle, Activity, 
+  FileWarning, Tags, FileText, LayoutDashboard, ChevronRight
+} from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
@@ -106,6 +110,16 @@ const ProcessingModule: React.FC<Props> = ({
   const [newDescriptor, setNewDescriptor] = useState('');
   const [searchDescriptor, setSearchDescriptor] = useState('');
   const [similarityCheck, setSimilarityCheck] = useState<{ newTag: string, similarTags: string[] } | null>(null);
+
+  // Estatísticas de saúde da base de dados
+  const stats = useMemo(() => {
+    return {
+      total: existingDB.length,
+      missingSummary: existingDB.filter(a => a.sumario === 'Sumário não encontrado' || !a.sumario).length,
+      missingTags: existingDB.filter(a => a.descritores.length === 0).length,
+      incompleteMetadata: existingDB.filter(a => a.relator === 'Desconhecido' || a.data === 'N/D').length,
+    };
+  }, [existingDB]);
 
   const sortedDescriptors = useMemo(() => {
     return (availableDescriptors || [])
@@ -212,7 +226,7 @@ const ProcessingModule: React.FC<Props> = ({
   };
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-8 h-full overflow-y-auto custom-scrollbar pb-32">
+    <div className="p-6 max-w-6xl mx-auto space-y-10 h-full overflow-y-auto custom-scrollbar pb-32">
       {processing && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md">
            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-6">
@@ -252,90 +266,139 @@ const ProcessingModule: React.FC<Props> = ({
           </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 col-span-2">
-            <h2 className="text-2xl font-black text-legal-900 mb-6 flex items-center gap-3 uppercase tracking-tighter">Sincronização Segura</h2>
-            <div className="flex flex-col gap-4">
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pasta Ativa: <span className="text-legal-900">{rootHandleName || 'Não Selecionada'}</span></p>
-              <button onClick={handleSyncClick} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest w-fit">
-                  <Loader2 className={`w-5 h-5 ${processing ? 'animate-spin' : ''}`}/> {processing ? 'Sincronizando...' : 'Sincronizar Novos PDFs'}
-              </button>
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 text-legal-900 mb-2">
+            <LayoutDashboard className="w-6 h-6" />
+            <h2 className="text-2xl font-black uppercase tracking-tighter">Cockpit de Gestão</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Total na Biblioteca</span>
+                <span className="text-3xl font-black text-legal-900">{stats.total}</span>
+            </div>
+            <div className={`p-6 rounded-[2rem] border shadow-sm flex flex-col gap-1 ${stats.missingSummary > 0 ? 'bg-orange-50 border-orange-100' : 'bg-white border-gray-100'}`}>
+                <div className="flex justify-between items-start">
+                    <span className="text-[9px] font-black uppercase text-orange-600 tracking-widest">Sem Sumário</span>
+                    <FileWarning className="w-4 h-4 text-orange-400" />
+                </div>
+                <span className={`text-3xl font-black ${stats.missingSummary > 0 ? 'text-orange-700' : 'text-gray-300'}`}>{stats.missingSummary}</span>
+            </div>
+            <div className={`p-6 rounded-[2rem] border shadow-sm flex flex-col gap-1 ${stats.missingTags > 0 ? 'bg-purple-50 border-purple-100' : 'bg-white border-gray-100'}`}>
+                <div className="flex justify-between items-start">
+                    <span className="text-[9px] font-black uppercase text-purple-600 tracking-widest">Sem Tags</span>
+                    <Tags className="w-4 h-4 text-purple-400" />
+                </div>
+                <span className={`text-3xl font-black ${stats.missingTags > 0 ? 'text-purple-700' : 'text-gray-300'}`}>{stats.missingTags}</span>
+            </div>
+            <div className={`p-6 rounded-[2rem] border shadow-sm flex flex-col gap-1 ${stats.incompleteMetadata > 0 ? 'bg-blue-50 border-blue-100' : 'bg-white border-gray-100'}`}>
+                <div className="flex justify-between items-start">
+                    <span className="text-[9px] font-black uppercase text-blue-600 tracking-widest">Dados em Falta</span>
+                    <UserCheck className="w-4 h-4 text-blue-400" />
+                </div>
+                <span className={`text-3xl font-black ${stats.incompleteMetadata > 0 ? 'text-blue-700' : 'text-gray-300'}`}>{stats.incompleteMetadata}</span>
+            </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-[1fr,350px] gap-8">
+          <div className="space-y-8">
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                <h2 className="text-xl font-black text-legal-900 mb-6 flex items-center gap-3 uppercase tracking-tighter">
+                    <FolderUp className="w-5 h-5 text-legal-600"/> Sincronização Local
+                </h2>
+                <div className="flex flex-col gap-6">
+                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Caminho da Biblioteca</p>
+                        <p className="text-sm text-legal-900 font-bold">{rootHandleName || 'Pasta não selecionada'}</p>
+                    </div>
+                    {stats.total > 0 && <Check className="w-6 h-6 text-green-500" />}
+                </div>
+                <button onClick={handleSyncClick} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center justify-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest">
+                    <Loader2 className={`w-5 h-5 ${processing ? 'animate-spin' : ''}`}/> {processing ? 'Sincronizando...' : 'Procurar Novos Acórdãos na Pasta'}
+                </button>
+                </div>
+            </div>
+
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
+                <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
+                    <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
+                        <UserCheck className="w-5 h-5 text-legal-600"/> Padronização de Magistrados
+                    </h3>
+                    {selectedMainJudge && selectedAliases.length > 0 && (
+                        <button onClick={handleMerge} className="bg-green-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-green-700 transition-all active:scale-95 animate-in fade-in">
+                            <GitMerge className="w-4 h-4" /> Executar Fusão
+                        </button>
+                    )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] items-start gap-8">
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block px-1">Substituir (Eliminar Alias)</label>
+                        <JudgeAutocomplete allJudges={availableJudges} onSelect={(j) => { if (!selectedAliases.includes(j)) setSelectedAliases(p => [...p, j]); }} placeholder="Nome incorreto..." exclude={selectedMainJudge ? [selectedMainJudge, ...selectedAliases] : selectedAliases} />
+                        <div className="flex flex-wrap gap-2 pt-2">
+                            {selectedAliases.map(alias => (
+                                <div key={alias} className="bg-orange-100 text-orange-800 text-[9px] font-black uppercase px-3 py-2 rounded-xl border border-orange-200 flex items-center gap-2">
+                                    {alias}
+                                    <button onClick={() => setSelectedAliases(p => p.filter(a => a !== alias))} className="text-orange-400 hover:text-orange-600"><X className="w-3.5 h-3.5"/></button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="hidden md:flex items-center justify-center pt-12 text-gray-200"><ArrowRight className="w-6 h-6" /></div>
+                    <div className="space-y-4">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block px-1">Manter (Perfil Oficial)</label>
+                        <JudgeAutocomplete allJudges={availableJudges} onSelect={setSelectedMainJudge} placeholder="Nome oficial..." exclude={selectedAliases} />
+                        {selectedMainJudge && (
+                            <div className="p-4 bg-legal-900 text-white rounded-2xl flex items-center justify-between shadow-lg animate-in zoom-in-95 mt-2">
+                                <span className="text-[11px] font-black uppercase">{selectedMainJudge}</span>
+                                <button onClick={() => setSelectedMainJudge(null)} className="text-legal-300 hover:text-white"><X className="w-4 h-4"/></button>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </div>
           </div>
-          <div className="bg-legal-900 p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col justify-center gap-4">
-              <div className="flex items-center justify-between border-b border-legal-800 pb-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Na Biblioteca</span>
-                <span className="text-2xl font-black">{existingDB.length}</span>
-              </div>
-          </div>
-      </div>
 
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-8 border-b border-gray-50 pb-6">
-              <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
-                  <UserCheck className="w-5 h-5 text-legal-600"/> Padronização de Magistrados
-              </h3>
-              {selectedMainJudge && selectedAliases.length > 0 && (
-                  <button onClick={handleMerge} className="bg-green-600 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 shadow-xl hover:bg-green-700 transition-all active:scale-95 animate-in fade-in">
-                      <GitMerge className="w-4 h-4" /> Executar Fusão
-                  </button>
-              )}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr,auto,1fr] items-start gap-8">
-              <div className="space-y-4">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block px-1">Substituir (Eliminar Alias)</label>
-                  <JudgeAutocomplete allJudges={availableJudges} onSelect={(j) => { if (!selectedAliases.includes(j)) setSelectedAliases(p => [...p, j]); }} placeholder="Nome incorreto..." exclude={selectedMainJudge ? [selectedMainJudge, ...selectedAliases] : selectedAliases} />
-                  <div className="flex flex-wrap gap-2 pt-2">
-                      {selectedAliases.map(alias => (
-                          <div key={alias} className="bg-orange-100 text-orange-800 text-[9px] font-black uppercase px-3 py-2 rounded-xl border border-orange-200 flex items-center gap-2">
-                              {alias}
-                              <button onClick={() => setSelectedAliases(p => p.filter(a => a !== alias))} className="text-orange-400 hover:text-orange-600"><X className="w-3.5 h-3.5"/></button>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-              <div className="hidden md:flex items-center justify-center pt-12 text-gray-200"><ArrowRight className="w-6 h-6" /></div>
-              <div className="space-y-4">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block px-1">Manter (Perfil Oficial)</label>
-                  <JudgeAutocomplete allJudges={availableJudges} onSelect={setSelectedMainJudge} placeholder="Nome oficial..." exclude={selectedAliases} />
-                  {selectedMainJudge && (
-                      <div className="p-4 bg-legal-900 text-white rounded-2xl flex items-center justify-between shadow-lg animate-in zoom-in-95 mt-2">
-                          <span className="text-[11px] font-black uppercase">{selectedMainJudge}</span>
-                          <button onClick={() => setSelectedMainJudge(null)} className="text-legal-300 hover:text-white"><X className="w-4 h-4"/></button>
-                      </div>
-                  )}
-              </div>
-          </div>
-      </div>
+          <div className="space-y-8">
+            <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 h-fit">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
+                        <Tag className="w-5 h-5 text-legal-600"/> Vocabulário
+                    </h3>
+                </div>
+                <div className="space-y-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                        <input type="text" placeholder="Filtrar temas..." className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-legal-400 outline-none" value={searchDescriptor} onChange={e => setSearchDescriptor(e.target.value)} />
+                    </div>
+                    <div className="flex gap-2">
+                        <input type="text" className="flex-1 p-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" placeholder="Novo tema..." value={newDescriptor} onChange={e => setNewDescriptor(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddDescriptor()} />
+                        <button onClick={handleAddDescriptor} className="bg-legal-900 text-white px-4 rounded-xl hover:bg-black transition-all shadow-lg"><Plus className="w-5 h-5"/></button>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto p-4 bg-gray-50 rounded-[1.5rem] border border-gray-100 custom-scrollbar grid grid-cols-1 gap-2">
+                        {sortedDescriptors.map(tag => (
+                            <div key={tag} className="flex items-center justify-between bg-white text-legal-900 text-[10px] font-black px-4 py-3 rounded-xl border border-gray-100 group">
+                                <span className="truncate">{tag}</span>
+                                <button onClick={() => { if (confirm(`Remover "${tag}"?`)) onAddDescriptors(legalArea, availableDescriptors!.filter(d => d !== tag)); }} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 ml-2"><Trash2 className="w-3.5 h-3.5"/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
 
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100">
-           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <h3 className="text-sm font-black text-legal-900 flex items-center gap-2 uppercase tracking-widest">
-                    <Tag className="w-5 h-5 text-legal-600"/> Gestão de Vocabulário
-                </h3>
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                    <input type="text" placeholder="Pesquisar tema..." className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold w-64 focus:ring-2 focus:ring-legal-400 outline-none" value={searchDescriptor} onChange={e => setSearchDescriptor(e.target.value)} />
+            <div className="bg-slate-900 text-slate-300 p-6 rounded-[2rem] font-mono text-[10px] h-48 overflow-y-auto shadow-2xl border border-slate-800 custom-scrollbar">
+                <div className="flex items-center gap-2 mb-4 text-slate-500 border-b border-slate-800 pb-2">
+                    <Activity className="w-3.5 h-3.5" />
+                    <span className="uppercase tracking-widest font-black">Consola de Eventos</span>
                 </div>
-           </div>
-           <div className="space-y-6">
-                <div className="flex gap-2">
-                    <input type="text" className="flex-1 p-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-bold outline-none" placeholder="Adicionar novo descritor..." value={newDescriptor} onChange={e => setNewDescriptor(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddDescriptor()} />
-                    <button onClick={handleAddDescriptor} className="bg-legal-900 text-white px-6 rounded-2xl hover:bg-black transition-all shadow-xl"><Plus className="w-6 h-6"/></button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto p-4 bg-gray-50 rounded-3xl border border-gray-100 custom-scrollbar">
-                    {sortedDescriptors.map(tag => (
-                        <div key={tag} className="flex items-center justify-between bg-white text-legal-900 text-[10px] font-black px-4 py-2.5 rounded-xl border border-gray-200 group">
-                            {tag}
-                            <button onClick={() => { if (confirm(`Remover "${tag}"?`)) onAddDescriptors(legalArea, availableDescriptors!.filter(d => d !== tag)); }} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100"><Trash2 className="w-3.5 h-3.5"/></button>
-                        </div>
-                    ))}
-                </div>
-           </div>
-      </div>
-
-      <div className="bg-slate-900 text-slate-300 p-8 rounded-[2.5rem] font-mono text-[11px] h-48 overflow-y-auto shadow-2xl border border-slate-800 custom-scrollbar">
-           {logs.map((log, i) => <div key={i} className="mb-1 opacity-80">{" > "} {log}</div>)}
+                {logs.length === 0 ? (
+                    <div className="opacity-20 italic">A aguardar atividade...</div>
+                ) : (
+                    logs.map((log, i) => <div key={i} className="mb-1 opacity-80">{" > "} {log}</div>)
+                )}
+            </div>
+          </div>
       </div>
     </div>
   );
