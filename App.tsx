@@ -26,12 +26,52 @@ function App() {
   
   const [folderName, setFolderName] = useState<string | null>(null);
   const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
+  const [hasApiKey, setHasApiKey] = useState<boolean>(false);
   const [isIndexing, setIsIndexing] = useState(false);
   
   const [onboardingStep, setOnboardingStep] = useState<'area' | 'setup' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
+
+  // Monitorização da chave API
+  useEffect(() => {
+    const checkKeyStatus = async () => {
+      // 1. Verificar se existe no ambiente (Vercel)
+      if (process.env.API_KEY && process.env.API_KEY.length > 5) {
+        setHasApiKey(true);
+        return;
+      }
+
+      // 2. Verificar se existe seletor do AI Studio
+      if (window.aistudio) {
+        try {
+          const selected = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(selected);
+        } catch (e) {
+          console.debug("Aguardando interface AI Studio...");
+        }
+      }
+    };
+
+    checkKeyStatus();
+    const timer = setInterval(checkKeyStatus, 3000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleOpenKeySelector = async () => {
+    if (window.aistudio) {
+      try {
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true); // Assumir sucesso após abrir o diálogo
+      } catch (e) {
+        console.error("Erro ao abrir seletor", e);
+      }
+    } else {
+      // Instrução para utilizadores no Vercel
+      alert("Para configurar a API no Vercel:\n1. Vá às definições do projeto no Vercel\n2. Adicione uma Environment Variable chamada API_KEY\n3. Introduza a sua chave Gemini API\n4. Re-deploy ou recarregue a aplicação.");
+    }
+  };
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
@@ -85,7 +125,6 @@ function App() {
     setIsIndexing(true);
     const newCache = new Map<string, File>();
     
-    // Tenta detetar o nome da pasta principal
     const firstFile = files[0];
     if (firstFile.webkitRelativePath) {
       setFolderName(firstFile.webkitRelativePath.split('/')[0]);
@@ -96,7 +135,6 @@ function App() {
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.toLowerCase().endsWith('.pdf')) {
-        // Indexação dupla: por caminho relativo e por nome base
         if (f.webkitRelativePath) {
           newCache.set(f.webkitRelativePath.toLowerCase(), f);
         }
@@ -109,19 +147,12 @@ function App() {
   };
 
   const openPdf = async (filePath: string) => {
-    if (fileCache.size === 0) {
-      alert("⚠️ Pasta de documentos não carregada.\n\nPor favor, utilize o botão 'Selecionar Pasta Mãe' no ecrã de Configuração para permitir a visualização dos PDFs.");
-      return;
-    }
-
     const pathLower = filePath.toLowerCase();
     const fileName = (filePath.split('/').pop() || filePath).toLowerCase();
-    
-    // Procura no cache por caminho completo ou apenas pelo nome do ficheiro
     const file = fileCache.get(pathLower) || fileCache.get(fileName);
     
     if (!file) {
-      alert(`⚠️ Ficheiro "${fileName}" não encontrado.\n\nCertifique-se de que selecionou a pasta que contém este documento.`);
+      alert(`⚠️ Ficheiro "${fileName}" não encontrado.\n\nPor favor, selecione a pasta dos documentos na Configuração.`);
       return;
     }
     
@@ -227,53 +258,56 @@ function App() {
                 <div className="flex items-center gap-4">
                     <div className="p-4 bg-blue-600/20 rounded-2xl border border-blue-500/20"><Settings className="w-8 h-8 text-blue-500" /></div>
                     <div>
-                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Configuração Local</h2>
-                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Preparação da Biblioteca</p>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Configuração Inicial</h2>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Preparação do Espaço de Trabalho</p>
                     </div>
                 </div>
                 <button onClick={() => setOnboardingStep('area')} className="p-2 text-slate-500 hover:text-white transition-all"><X/></button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                {/* Passo 1: Metadados */}
+                {/* Ativação de API */}
+                <div className={`p-6 rounded-[28px] border-2 transition-all ${hasApiKey ? 'border-green-500/30 bg-green-500/5' : 'border-blue-500/30 bg-blue-500/5'}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <Key className={`w-6 h-6 ${hasApiKey ? 'text-green-500' : 'text-blue-500'}`} />
+                        {hasApiKey && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                    </div>
+                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">Chave Gemini API</h3>
+                    <p className="text-slate-400 text-[10px] mb-4">Necessária para IA e chat jurídico.</p>
+                    <button onClick={handleOpenKeySelector} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase transition-all shadow-lg ${hasApiKey ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                        {hasApiKey ? 'Chave Ativada' : 'Ativar API'}
+                    </button>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="block text-center mt-3 text-[9px] font-black text-blue-400 uppercase hover:underline">Info Faturação API</a>
+                </div>
+
+                {/* Base de Dados */}
                 <div className={`p-6 rounded-[28px] border-2 transition-all ${db.length > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-slate-700 bg-slate-800/30'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <Database className={`w-6 h-6 ${db.length > 0 ? 'text-green-500' : 'text-slate-400'}`} />
-                      {db.length > 0 && <CheckCircle2 className="w-5 h-5 text-green-500" />}
-                    </div>
-                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">1. Base de Dados (Opcional)</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos lidos.` : 'Carregue um ficheiro JSON de backup anterior.'}</p>
-                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-600 transition-all">Carregar JSON</button>
+                    <Database className={`w-6 h-6 mb-4 ${db.length > 0 ? 'text-green-500' : 'text-slate-400'}`} />
+                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">Base de Dados</h3>
+                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos lidos.` : 'Opcional: carregar backup JSON.'}</p>
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-600">Carregar JSON</button>
                 </div>
 
-                {/* Passo 2: Pasta PDF */}
-                <div className={`p-6 rounded-[28px] border-2 transition-all ${fileCache.size > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'}`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <FolderOpen className={`w-6 h-6 ${fileCache.size > 0 ? 'text-green-500' : 'text-orange-500'}`} />
-                      {fileCache.size > 0 && <CheckCircle2 className="w-5 h-5 text-green-500" />}
+                {/* Pasta PDF */}
+                <div className={`p-6 rounded-[28px] border-2 col-span-1 md:col-span-2 transition-all ${fileCache.size > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'}`}>
+                    <div className="flex items-center gap-4 mb-4">
+                        <FolderOpen className={`w-8 h-8 ${fileCache.size > 0 ? 'text-green-500' : 'text-orange-500'}`} />
+                        <div className="flex-1">
+                            <h3 className="text-white font-black text-[11px] uppercase tracking-widest">Documentos PDF</h3>
+                            <p className="text-slate-400 text-[10px]">{fileCache.size > 0 ? `${fileCache.size} ficheiros indexados.` : 'Selecione a pasta para visualizar PDFs.'}</p>
+                        </div>
                     </div>
-                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">2. Documentos PDF (Importante)</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">{fileCache.size > 0 ? `${fileCache.size} ficheiros disponíveis.` : 'Selecione a pasta para poder abrir e processar ficheiros.'}</p>
-                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-3 bg-orange-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-lg shadow-orange-900/20 transition-all">Selecionar Pasta</button>
-                    {isIndexing && <div className="mt-2 text-[9px] text-orange-400 font-bold uppercase animate-pulse">Indexando ficheiros...</div>}
+                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-xl">Selecionar Pasta Mãe</button>
+                    {isIndexing && <div className="mt-2 text-[9px] text-orange-400 font-bold uppercase animate-pulse">Indexando biblioteca...</div>}
                 </div>
-            </div>
-
-            <div className="bg-slate-800/50 p-6 rounded-[24px] mb-8 border border-slate-700/50">
-              <div className="flex items-center gap-3 mb-2">
-                <ShieldCheck className="w-5 h-5 text-blue-400" />
-                <h4 className="text-white font-black text-[10px] uppercase tracking-widest">Segurança Gemini Ativa</h4>
-              </div>
-              <p className="text-slate-400 text-[10px] leading-relaxed">
-                A aplicação utiliza a chave API configurada no ambiente para processar os dados localmente. Nenhuma informação de identificação é partilhada externamente.
-              </p>
             </div>
 
             <button 
                 onClick={() => setOnboardingStep('app')}
-                className="w-full py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-3 bg-blue-600 text-white hover:scale-[1.01] active:scale-95 shadow-blue-900/40"
+                disabled={!hasApiKey}
+                className={`w-full py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-3 ${hasApiKey ? 'bg-blue-600 text-white hover:scale-[1.01] active:scale-95' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}
             >
-                <PlayCircle className="w-6 h-6" /> Iniciar JurisAnalítica
+                {hasApiKey ? <><PlayCircle className="w-6 h-6" /> Entrar na Aplicação</> : "Ative a API para Iniciar"}
             </button>
         </div>
       )}
@@ -297,15 +331,7 @@ function App() {
               reader.readAsText(file);
           }
       }} />
-      <input 
-        type="file" 
-        ref={directoryInputRef} 
-        className="hidden" 
-        webkitdirectory="true" 
-        directory="true" 
-        multiple 
-        onChange={handleDirectorySelect} 
-      />
+      <input type="file" ref={directoryInputRef} className="hidden" webkitdirectory="true" directory="true" multiple onChange={handleDirectorySelect} />
     </>
   );
 }
