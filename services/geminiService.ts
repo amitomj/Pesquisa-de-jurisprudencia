@@ -9,13 +9,16 @@ const handleApiError = async (error: any) => {
   return "ERROR";
 };
 
+/**
+ * Generates a legal answer using Gemini 3 Pro based on the provided documents.
+ * Uses process.env.API_KEY directly as per guidelines.
+ */
 export const generateLegalAnswer = async (
   question: string,
-  context: Acordao[],
-  apiKey: string
+  context: Acordao[]
 ): Promise<string> => {
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const relevantContext = context.map(c => {
       const direito = c.fundamentacaoDireito || "[Fundamentação de Direito não segmentada separadamente]";
@@ -78,9 +81,13 @@ ${question}`,
   }
 };
 
-export const extractMetadataWithAI = async (textContext: string, availableDescriptors: string[], apiKey: string): Promise<any> => {
+/**
+ * Extracts metadata and summary from document text using Gemini 3 Flash.
+ * Uses process.env.API_KEY directly as per guidelines.
+ */
+export const extractMetadataWithAI = async (textContext: string, availableDescriptors: string[]): Promise<any> => {
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-3-flash-preview",
       contents: `Atua como um extrator de texto literal de acórdãos judiciais. 

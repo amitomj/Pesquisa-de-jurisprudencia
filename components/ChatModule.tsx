@@ -12,13 +12,12 @@ interface Props {
   onSaveSession: (session: ChatSession) => void;
   onDeleteSession: (id: string) => void;
   onOpenPdf: (fileName: string) => void;
-  apiKey: string;
 }
 
 // Função para normalizar números de processo (remove pontos, barras, traços)
 const canonicalizeProcesso = (p: string) => p.replace(/[\.\/\-\s]/g, '').toLowerCase();
 
-const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf, apiKey }) => {
+const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSession, onOpenPdf }) => {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,10 +38,6 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
   };
 
   const handleSend = async () => {
-    if (!apiKey) {
-      alert("⚠️ Configure primeiro a sua Gemini API Key no topo.");
-      return;
-    }
     if (!input.trim() || loading) return;
     
     let session = currentSession;
@@ -109,7 +104,7 @@ const ChatModule: React.FC<Props> = ({ db, sessions, onSaveSession, onDeleteSess
         return;
       }
 
-      const answer = await generateLegalAnswer(userInput, relevantContext, apiKey);
+      const answer = await generateLegalAnswer(userInput, relevantContext);
       const botMsg: ChatMessage = { id: crypto.randomUUID(), role: 'model', content: answer, timestamp: Date.now(), sources: relevantContext };
 
       const finalSession = { ...session, messages: [...updatedMessages, botMsg] };

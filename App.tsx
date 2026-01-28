@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2, Settings, FolderOpen, X } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Upload, MessageSquare, Download, History, Database, Trash2, Key, ShieldCheck, AlertCircle, Info, Lock, ExternalLink, Globe, Loader2, Settings, FolderOpen, X, FileJson, FileType, PlayCircle, ChevronRight, UserCheck } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Abono de viagem", "Abono para falhas", "Absolvição da instância", "Absolvição do pedido",
@@ -131,7 +131,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Fundamentação", "Fundamentação de direito", "Fundamentação de facto", "Fundo de compensação do trabalho",
   "Fundo de garantia de compensação do trabalho", "Fundo de pensões", "Fusão de empresas", "Futebolista profissional",
   "Garantia autónoma", "Garantia bancária", "Garantia de defesa", "Garantia do pagamento", "Garantias do trabalhador",
-  "Genérico agrícola", "Gerente", "Gestor público", "GPS", "Graduação de créditos", "Grandes superfícies", "Gratificação",
+  "Genérico agrícola", "Gerente", "Gestor público", "GPS", "Graduação de créditos", "Grandes superfies", "Gratificação",
   "Gratificação extraordinária", "Gravação da audiência", "Gravação da prova", "Gravidade da infracção", "Greve",
   "Grupo de empresas", "Habilitação de herdeiros", "Herança indivisa", "Homologação de deliberação da assembleia de credores",
   "Honorários", "Horário de trabalho", "Horário flexível", "Hospital", "IAS", "Igreja", "Igualdade das partes", "Ilações",
@@ -144,7 +144,7 @@ const SOCIAL_DESCRIPTORS_LIST = [
   "Incapacidade temporária absoluta", "Incapacidade temporária superior a dezoito meses", "Incidentes da instância",
   "Incompetência absoluta", "Incompetência relativa", "Inconstitucionalidade", "Incumprimento do contrato",
   "Incumprimento parcial", "Incumprimento por facto de terceiro", "Indeferimento liminar", "Indeferimento tácito",
-  "Indemnização", "Indemnização de antiguidade", "Indemnização por falta de aviso prévio",
+  "Indemnização", "Indemnização de antiguidade", "Indemnização por para falta de aviso prévio",
   "Indemnização por incumprimento de obrigações laborais", "Indeterminabilidade", "Indeterminação do objecto",
   "Indícios de subordinação jurídica", "Indivisibilidade", "Ineptidão da petição inicial", "Informação e consulta",
   "Informação genética", "Infracção continuada", "Infracção disciplinar", "Infracção estradal", "Início de laboração",
@@ -300,58 +300,19 @@ function App() {
   const [judges, setJudges] = useState<string[]>([]);
   const [legalArea, setLegalArea] = useState<'social' | 'crime' | 'civil' | null>(null);
   const [activeTab, setActiveTab] = useState<'process' | 'search' | 'chat'>('process');
-  const [rootHandleName, setRootHandleName] = useState<string | null>(null);
-  const [rootHandle, setRootHandle] = useState<FileSystemDirectoryHandle | null>(null);
   
-  // BYOK State - Frontend Only
-  const [userApiKey, setUserApiKey] = useState<string>('');
-  const [isAiConfigured, setIsAiConfigured] = useState<boolean>(false);
+  // File Handles e Cache
+  const [folderName, setFolderName] = useState<string | null>(null);
+  const [fileCache, setFileCache] = useState<Map<string, File>>(new Map());
   
-  const [onboardingStep, setOnboardingStep] = useState<'area' | 'app'>('area');
+  const [onboardingStep, setOnboardingStep] = useState<'area' | 'setup' | 'app'>('area');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
-
-  // Carrega key do localStorage ao iniciar
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('gemini_user_key');
-      if (stored && stored.length > 20) {
-        setUserApiKey(stored);
-        setIsAiConfigured(true);
-      }
-    }
-  }, []);
-
-  // Botão "Configurar IA" - Frontend Only sem window.aistudio
-  const handleSetupKey = () => {
-    const key = window.prompt(
-      'Configuração de IA (Apenas Frontend):\n\n' +
-      'Cole aqui a sua Gemini API Key.\n\n' +
-      '✓ Fica guardada apenas neste browser\n' +
-      '✓ Sem backend, 100% privado e seguro\n' +
-      '✓ Usa a sua própria quota/créditos',
-      userApiKey || ''
-    );
-    
-    if (key !== null) {
-      const trimmed = key.trim();
-      if (trimmed === '') {
-        setUserApiKey('');
-        setIsAiConfigured(false);
-        localStorage.removeItem('gemini_user_key');
-      } else if (trimmed.length < 20) {
-        alert('Chave inválida (deve ter aproximadamente 40 caracteres).');
-      } else {
-        setUserApiKey(trimmed);
-        setIsAiConfigured(true);
-        localStorage.setItem('gemini_user_key', trimmed);
-      }
-    }
-  };
+  const directoryInputRef = useRef<HTMLInputElement>(null);
 
   const selectLegalArea = (area: 'social' | 'crime' | 'civil') => {
     setLegalArea(area);
-    setOnboardingStep('app');
+    setOnboardingStep('setup');
   };
 
   useEffect(() => {
@@ -387,7 +348,6 @@ function App() {
         });
 
         if (changed) {
-            // FIX: Explicitly typing the filter parameter 'a' as string to resolve 'unknown' type errors for toLowerCase and length.
             const uniqueAdjuntos = Array.from(new Set(newAdjuntos))
               .filter((a: string) => a.toLowerCase() !== newRelator.toLowerCase() && a !== 'Nenhum' && a.length > 0);
             return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
@@ -395,12 +355,6 @@ function App() {
         return ac;
       });
     });
-  };
-
-  const handleSetRoot = (handle: FileSystemDirectoryHandle) => {
-    setRootHandle(handle);
-    setRootHandleName(handle.name);
-    setActiveTab('process');
   };
 
   const handleAddAcordaos = (incoming: Acordao[]) => {
@@ -415,24 +369,46 @@ function App() {
     });
   };
 
-  const openPdf = async (fileName: string) => {
-    if (rootHandle) {
-       const findFile = async (dir: FileSystemDirectoryHandle, name: string): Promise<FileSystemFileHandle | null> => {
-          for await (const entry of (dir as any).values()) {
-             if (entry.kind === 'file' && entry.name === name) return entry;
-             if (entry.kind === 'directory') {
-                const found = await findFile(entry as any, name);
-                if (found) return found;
-             }
-          }
-          return null;
-       };
-       const handle = await findFile(rootHandle, fileName);
-       if (handle) {
-          const file = await handle.getFile();
-          window.open(URL.createObjectURL(file), '_blank');
-       }
+  const handleDirectorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newCache = new Map<string, File>();
+    const pdfs: File[] = [];
+    
+    // Obter o nome da pasta mãe a partir do caminho do primeiro ficheiro
+    if (files[0].webkitRelativePath) {
+      const parts = files[0].webkitRelativePath.split('/');
+      if (parts.length > 0) setFolderName(parts[0]);
     }
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f.name.toLowerCase().endsWith('.pdf')) {
+        pdfs.push(f);
+        newCache.set(f.name, f);
+      }
+    }
+    
+    setFileCache(newCache);
+    alert(`${pdfs.length} ficheiros PDF localizados na estrutura de pastas.`);
+  };
+
+  const openPdf = async (fileName: string) => {
+    const file = fileCache.get(fileName);
+    if (!file) {
+      alert(`⚠️ O ficheiro "${fileName}" não está no cache da sessão.\n\nPor favor, volte ao ecrã de 'Configuração de Sessão' e aponte novamente para a pasta mãe para restaurar o acesso aos ficheiros.`);
+      return;
+    }
+
+    const win = window.open('about:blank', '_blank');
+    if (!win) {
+      alert("O navegador bloqueou a abertura do PDF. Por favor, permita pop-ups para esta aplicação.");
+      return;
+    }
+    
+    const fileURL = URL.createObjectURL(file);
+    win.location.href = fileURL;
   };
 
   const handleSaveDb = () => {
@@ -440,7 +416,16 @@ function App() {
     const blob = new Blob([json], { type: "application/json" });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `juris_backup_${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `juris_base_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+  };
+
+  const handleSaveChats = () => {
+    const json = JSON.stringify({ chatSessions }, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `juris_chats_${new Date().toISOString().slice(0,10)}.json`;
     a.click();
   };
 
@@ -459,9 +444,8 @@ function App() {
             if (parsed.descriptors.civil) merged.civil = Array.from(new Set([...descriptors.civil, ...parsed.descriptors.civil])).sort();
             setDescriptors(merged);
         }
-        setOnboardingStep('app');
       } catch (err) {
-        alert("Erro ao ler ficheiro de backup.");
+        alert("Erro ao ler ficheiro de base de dados.");
       }
     };
     reader.readAsText(file);
@@ -476,15 +460,11 @@ function App() {
       try {
         const parsed = JSON.parse(ev.target?.result as string);
         if (parsed.chatSessions) {
-            setChatSessions(current => {
-                const existingIds = new Set(current.map(s => s.id));
-                const filteredNew = parsed.chatSessions.filter((s: ChatSession) => !existingIds.has(s.id));
-                return [...filteredNew, ...current];
-            });
-            alert("Chat carregado com sucesso.");
+            setChatSessions(parsed.chatSessions);
+            alert("Sessões de chat carregadas.");
         }
       } catch (err) {
-        alert("Erro ao ler histórico.");
+        alert("Erro ao ler histórico de chats.");
       }
     };
     reader.readAsText(file);
@@ -502,30 +482,20 @@ function App() {
               <p className="text-[9px] text-legal-400 uppercase tracking-widest font-black mt-1">Área {legalArea}</p>
             </div>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-3 items-center">
             
-            <button 
-                onClick={handleSetupKey}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[9px] font-black uppercase transition-all border ${isAiConfigured ? 'bg-green-500/10 border-green-500/20 text-green-400' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'}`}
-            >
-                {isAiConfigured ? <ShieldCheck className="w-4 h-4" /> : <Key className="w-4 h-4" />}
-                {isAiConfigured ? 'Sua Chave API Ativa' : 'Configurar Chave Gemini'}
-            </button>
-
-            <div className="h-10 w-px bg-legal-800 mx-2 self-center"></div>
-            
-            <button onClick={() => chatInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white transition-all" title="Importar Chat">
-                <History className="w-4 h-4" />
-            </button>
-            
-            <div className="flex gap-1 items-center bg-legal-800/40 p-1 rounded-2xl border border-legal-700 ml-2">
-                <button onClick={() => fileInputRef.current?.click()} className="p-2.5 text-legal-300 hover:text-white transition-all" title="Importar Base">
-                    <FolderOpen className="w-4 h-4" />
+            <div className="flex gap-2 p-1 bg-legal-800/40 rounded-2xl border border-legal-700">
+                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-[9px] font-black uppercase transition-all shadow-lg">
+                    <Database className="w-3.5 h-3.5" /> Backup Base
                 </button>
-                <button onClick={handleSaveDb} className="flex items-center gap-2 px-4 py-2 bg-white text-legal-900 hover:bg-legal-50 rounded-xl text-[9px] font-black uppercase transition-all">
-                    <Save className="w-4 h-4" /> Backup
+                <button onClick={handleSaveChats} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-xl text-[9px] font-black uppercase transition-all shadow-lg">
+                    <MessageSquare className="w-3.5 h-3.5" /> Backup Chats
                 </button>
             </div>
+
+            <button onClick={() => setOnboardingStep('setup')} className="p-2.5 text-legal-300 hover:text-white transition-all bg-legal-800/20 rounded-xl border border-legal-700 ml-1" title="Sair / Reconfigurar">
+                <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </header>
@@ -543,8 +513,8 @@ function App() {
               <ProcessingModule 
                 onDataLoaded={handleAddAcordaos} 
                 existingDB={db} 
-                onSetRootHandle={handleSetRoot} 
-                rootHandleName={rootHandleName} 
+                onSetRootHandle={() => {}} 
+                rootHandleName={folderName} 
                 onCacheFiles={() => {}} 
                 onAddDescriptors={(cat, l) => setDescriptors(p=>({...p, [cat]:l}))} 
                 onAddJudges={setJudges} 
@@ -554,7 +524,7 @@ function App() {
                 legalArea={legalArea}
                 onUpdateDb={setDb}
                 onSaveDb={handleSaveDb}
-                apiKey={userApiKey}
+                filesFromFolder={Array.from(fileCache.values())}
               />
             )}
             {activeTab === 'search' && (
@@ -564,7 +534,6 @@ function App() {
                 onUpdateAcordao={u => setDb(p => p.map(x=>x.id===u.id?u:x))} 
                 availableDescriptors={legalArea?descriptors[legalArea]:[]} 
                 availableJudges={judges} 
-                apiKey={userApiKey}
               />
             )}
             {activeTab === 'chat' && (
@@ -582,57 +551,108 @@ function App() {
                 })} 
                 onDeleteSession={(id) => setChatSessions(p => p.filter(s => s.id !== id))} 
                 onOpenPdf={openPdf}
-                apiKey={userApiKey}
               />
             )}
         </div>
       </div>
     </div>
   ) : (
-    <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-4">
-      <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-legal-400 to-blue-500"></div>
-          
-          <div className="mb-10 flex justify-center">
-            <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
-              <ScaleIcon className="w-12 h-12 text-blue-500"/>
+    <div className="fixed inset-0 bg-[#0f172a] z-[100] flex items-center justify-center p-6">
+      {onboardingStep === 'area' ? (
+        <div className="bg-[#1e293b] rounded-[32px] shadow-2xl p-10 max-w-[500px] w-full text-center border border-slate-700/50 relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-legal-400 to-blue-500"></div>
+            <div className="mb-10 flex justify-center">
+              <div className="p-8 bg-blue-600/10 rounded-full border border-blue-600/20">
+                <ScaleIcon className="w-12 h-12 text-blue-500"/>
+              </div>
             </div>
-          </div>
-          <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">JurisAnalítica</h2>
-          <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
-          <div className="grid grid-cols-1 gap-4">
-            {['social', 'crime', 'civil'].map((area: any) => (
-              <button 
-                key={area} 
-                onClick={() => selectLegalArea(area)} 
-                className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
-              >
-                <div className="p-4 bg-slate-700 rounded-2xl group-hover:bg-blue-900/20 transition-all">
-                  {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
-                </div>
-                <div>
-                    <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sessão Local</div>
-                </div>
-              </button>
-            ))}
-            <div className="h-px bg-slate-700/50 my-6"></div>
-            <div className="grid grid-cols-2 gap-3">
-                <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <Database className="w-5 h-5 text-blue-500"/> Base JSON
+            <h2 className="text-3xl font-black mb-2 tracking-tighter text-white uppercase">JurisAnalítica</h2>
+            <p className="text-slate-400 mb-10 text-sm">Selecione a jurisdição de trabalho.</p>
+            <div className="grid grid-cols-1 gap-4">
+              {['social', 'crime', 'civil'].map((area: any) => (
+                <button 
+                  key={area} 
+                  onClick={() => selectLegalArea(area)} 
+                  className="group p-6 rounded-[24px] border border-slate-700 bg-slate-800/50 hover:border-blue-500 hover:bg-slate-800 transition-all flex items-center gap-6 text-left active:scale-95 shadow-sm"
+                >
+                  <div className="p-4 bg-slate-700 rounded-2xl group-hover:bg-blue-900/20 transition-all">
+                    {area === 'social' ? <Briefcase className="w-8 h-8 text-blue-400"/> : area === 'crime' ? <Gavel className="w-8 h-8 text-blue-400"/> : <ScaleIcon className="w-8 h-8 text-blue-400"/>}
+                  </div>
+                  <div>
+                      <div className="capitalize font-black text-xl text-white tracking-tighter">Área {area}</div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Sessão Local</div>
+                  </div>
                 </button>
-                <button onClick={() => chatInputRef.current?.click()} className="flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border border-dashed border-slate-600 text-slate-400 hover:text-white transition-all font-bold text-[9px] uppercase tracking-widest group">
-                    <MessageSquare className="w-5 h-5 text-green-500"/> Chats JSON
-                </button>
+              ))}
             </div>
+        </div>
+      ) : (
+        <div className="bg-[#1e293b] rounded-[40px] shadow-2xl p-12 max-w-[650px] w-full border border-slate-700/50 relative overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+            <div className="absolute top-0 left-0 w-full h-1 bg-blue-500"></div>
             
-            <div className="mt-8 pt-6 border-t border-slate-700/50 flex flex-col gap-3">
-                 <button onClick={handleSetupKey} className="flex items-center justify-center gap-2 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 transition-all">
-                    <Settings className="w-4 h-4"/> Configurar Chave Gemini (Privado)
-                 </button>
+            <div className="flex items-center justify-between mb-10">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-blue-600/20 rounded-2xl border border-blue-500/20">
+                        <Settings className="w-8 h-8 text-blue-500" />
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Configuração de Sessão</h2>
+                        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">{legalArea} selecionado</p>
+                    </div>
+                </div>
+                <button onClick={() => setOnboardingStep('area')} className="p-2 text-slate-500 hover:text-white transition-all"><X/></button>
             </div>
-          </div>
-      </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+                <button onClick={() => fileInputRef.current?.click()} className="relative flex flex-col items-center justify-center gap-4 p-8 rounded-[28px] border-2 border-dashed border-slate-700 bg-slate-800/30 hover:border-blue-500/50 hover:bg-slate-800 transition-all group overflow-hidden">
+                    <Database className="w-8 h-8 text-blue-500 mb-1"/>
+                    <div className="text-center">
+                        <div className="text-white font-black uppercase text-[11px] tracking-widest">Biblioteca (JSON)</div>
+                        <div className="text-slate-500 text-[10px] font-bold mt-1">
+                            {db.length > 0 ? `${db.length} Acórdãos Carregados` : 'Carregar Backup'}
+                        </div>
+                    </div>
+                    {db.length > 0 && <div className="absolute top-4 right-4"><UserCheck className="w-4 h-4 text-green-500" /></div>}
+                </button>
+
+                <button onClick={() => chatInputRef.current?.click()} className="relative flex flex-col items-center justify-center gap-4 p-8 rounded-[28px] border-2 border-dashed border-slate-700 bg-slate-800/30 hover:border-green-500/50 hover:bg-slate-800 transition-all group overflow-hidden">
+                    <MessageSquare className="w-8 h-8 text-green-500 mb-1"/>
+                    <div className="text-center">
+                        <div className="text-white font-black uppercase text-[11px] tracking-widest">Histórico (JSON)</div>
+                        <div className="text-slate-500 text-[10px] font-bold mt-1">
+                            {chatSessions.length > 0 ? `${chatSessions.length} Conversas Carregadas` : 'Carregar Backup'}
+                        </div>
+                    </div>
+                    {chatSessions.length > 0 && <div className="absolute top-4 right-4"><UserCheck className="w-4 h-4 text-green-500" /></div>}
+                </button>
+
+                <button onClick={() => directoryInputRef.current?.click()} className="relative flex flex-col items-center justify-center gap-4 p-8 rounded-[28px] border-2 border-dashed border-slate-700 bg-slate-800/30 hover:border-orange-500/50 hover:bg-slate-800 transition-all group col-span-1 md:col-span-2 overflow-hidden">
+                    <FolderOpen className="w-8 h-8 text-orange-500 mb-1"/>
+                    <div className="text-center">
+                        <div className="text-white font-black uppercase text-[11px] tracking-widest">Pasta Raiz dos PDFs (Com Subpastas)</div>
+                        <div className="text-slate-500 text-[10px] font-bold mt-1">
+                            {folderName ? `Lido de: ${folderName} (${fileCache.size} PDFs)` : 'Indique a pasta onde estão os arquivos originais'}
+                        </div>
+                    </div>
+                    {fileCache.size > 0 && <div className="absolute top-4 right-4"><UserCheck className="w-4 h-4 text-green-500" /></div>}
+                </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+                <button 
+                    onClick={() => setOnboardingStep('app')}
+                    className="w-full bg-blue-600 text-white py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-[0_10px_30px_rgba(37,99,235,0.3)] hover:bg-blue-500 hover:scale-[1.02] transition-all active:scale-95 flex items-center justify-center gap-3"
+                >
+                    <PlayCircle className="w-6 h-6" /> Iniciar Sessão de Trabalho
+                </button>
+                <div className="flex justify-center gap-6 text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                    <button onClick={() => { setDb([]); setChatSessions([]); setFileCache(new Map()); setFolderName(null); }} className="hover:text-red-400 flex items-center gap-2">
+                        <Trash2 className="w-3.5 h-3.5"/> Limpar Cache Local
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 
@@ -652,6 +672,16 @@ function App() {
         className="hidden" 
         accept=".json" 
         onChange={handleLoadChatFile}
+      />
+      <input 
+        type="file"
+        ref={directoryInputRef}
+        className="hidden"
+        // @ts-ignore
+        webkitdirectory="true"
+        directory="true"
+        multiple
+        onChange={handleDirectorySelect}
       />
     </>
   );

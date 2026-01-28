@@ -3,12 +3,12 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Acordao } from '../types';
 import { extractDataFromPdf } from '../services/pdfService';
 import { extractMetadataWithAI } from '../services/geminiService';
-import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle, Key } from 'lucide-react';
+import { FolderUp, FilePlus, Users, Trash2, Tag, Plus, Search, Loader2, GitMerge, Check, UserCheck, AlertCircle, X, ChevronDown, ArrowRight, AlertTriangle } from 'lucide-react';
 
 interface Props {
   onDataLoaded: (data: Acordao[]) => void;
   existingDB: Acordao[];
-  onSetRootHandle: (handle: FileSystemDirectoryHandle) => void;
+  onSetRootHandle: (handle: any) => void;
   rootHandleName: string | null;
   onCacheFiles: (files: File[]) => void;
   onAddDescriptors: (category: 'social' | 'crime' | 'civil', list: string[]) => void;
@@ -19,7 +19,7 @@ interface Props {
   legalArea: 'social' | 'crime' | 'civil';
   onUpdateDb: (db: Acordao[]) => void;
   onSaveDb: () => void;
-  apiKey: string;
+  filesFromFolder?: File[];
 }
 
 const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -95,7 +95,7 @@ const JudgeAutocomplete: React.FC<{
 const ProcessingModule: React.FC<Props> = ({ 
     onDataLoaded, existingDB, onSetRootHandle, rootHandleName,
     onAddDescriptors, onMergeJudges, availableJudges = [], availableDescriptors = [],
-    legalArea, onUpdateDb, apiKey
+    legalArea, onUpdateDb, filesFromFolder = []
 }) => {
   const [processing, setProcessing] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -181,32 +181,16 @@ const ProcessingModule: React.FC<Props> = ({
       }
   };
 
-  const getFilesRecursively = async (handle: FileSystemDirectoryHandle): Promise<File[]> => {
-    const files: File[] = [];
-    for await (const entry of (handle as any).values()) {
-      if (entry.kind === 'file' && entry.name.toLowerCase().endsWith('.pdf')) {
-        files.push(await (entry as any).getFile());
-      } else if (entry.kind === 'directory') {
-        files.push(...await getFilesRecursively(entry as any));
-      }
-    }
-    return files;
-  };
-
   const processFileList = async (files: File[]) => {
-    if (!apiKey) {
-      alert("Configure primeiro a sua Gemini API Key no topo da aplicação para permitir extração automática.");
-      return;
-    }
-
     setProcessing(true);
-    setLogs(prev => [`Analisando ${files.length} ficheiros...`]);
+    setLogs(prev => [`Analisando ${files.length} ficheiros PDF...`]);
     stopRequested.current = false;
+    
     const existingFileNames = new Set(existingDB.map(a => a.fileName));
     const newFiles = files.filter(f => !existingFileNames.has(f.name));
 
     if (newFiles.length === 0) {
-      setLogs(prev => [...prev, 'Nenhum ficheiro novo.']);
+      setLogs(prev => [...prev, 'Nenhum acórdão novo encontrado para processar.']);
       setProcessing(false);
       return;
     }
@@ -216,11 +200,11 @@ const ProcessingModule: React.FC<Props> = ({
       if (stopRequested.current) break;
       const file = newFiles[i];
       try {
-        setLogs(prev => [...prev, `Processando: ${file.name}`]);
+        setLogs(prev => [...prev, `Extraindo: ${file.name}`]);
         let data = await extractDataFromPdf(file);
         
-        if (data.sumario.includes('não identificado')) {
-            const aiResult = await extractMetadataWithAI(data.textoCompleto, availableDescriptors || [], apiKey);
+        if (data.sumario.includes('Sumário não encontrado')) {
+            const aiResult = await extractMetadataWithAI(data.textoAnalise, availableDescriptors || []);
             if (aiResult) {
                 if (aiResult.sumario) data.sumario = aiResult.sumario;
                 if (aiResult.descritores) data.descritores = aiResult.descritores;
@@ -228,34 +212,24 @@ const ProcessingModule: React.FC<Props> = ({
         }
         newData.push(data);
       } catch (err) {
-        setLogs(prev => [...prev, `Erro: ${file.name}`]);
+        setLogs(prev => [...prev, `Erro no ficheiro: ${file.name}`]);
       }
     }
     onDataLoaded(newData);
     setProcessing(false);
+    setLogs(prev => [...prev, `Processamento finalizado. ${newData.length} novos acórdãos na biblioteca.`]);
   };
 
-  const handleSelectFolder = async () => {
-    try {
-      const handle = await window.showDirectoryPicker();
-      onSetRootHandle(handle); 
-      const allFiles = await getFilesRecursively(handle);
-      await processFileList(allFiles);
-    } catch (err) {}
+  const handleSyncClick = () => {
+    if (filesFromFolder.length === 0) {
+        alert("A pasta mãe ainda não foi indicada no ecrã inicial ou está vazia.");
+        return;
+    }
+    processFileList(filesFromFolder);
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8 h-full overflow-y-auto custom-scrollbar pb-32">
-      {!apiKey && (
-        <div className="bg-orange-50 border border-orange-200 p-6 rounded-3xl flex items-center gap-4 text-orange-800 animate-in fade-in">
-          <Key className="w-8 h-8 flex-shrink-0" />
-          <div className="flex-1">
-             <h4 className="font-black uppercase text-xs">IA Não Configurada</h4>
-             <p className="text-[10px] font-bold opacity-80 uppercase leading-tight">A extração de sumários e descritores automáticos requer uma Gemini API Key ativa.</p>
-          </div>
-        </div>
-      )}
-
       {processing && (
         <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center backdrop-blur-md">
            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center gap-6">
@@ -315,21 +289,26 @@ const ProcessingModule: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-gray-100 col-span-2">
             <h2 className="text-2xl font-black text-legal-900 mb-6 flex items-center gap-3 uppercase tracking-tighter">
-              <FolderUp className="w-7 h-7 text-legal-600" /> Carregamento Local
+              <FolderUp className="w-7 h-7 text-legal-600" /> Sincronização Local
             </h2>
-            <button onClick={handleSelectFolder} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest">
-                <FilePlus className="w-5 h-5"/> {rootHandleName ? `Pasta Ativa: ${rootHandleName}` : 'Abrir Pasta de Acórdãos'}
-            </button>
+            <div className="flex flex-col gap-4">
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">
+                Pasta ativa: <span className="text-legal-900">{rootHandleName || 'Nenhuma'}</span>
+              </p>
+              <button onClick={handleSyncClick} className="bg-legal-900 hover:bg-black text-white px-10 py-5 rounded-[22px] flex items-center gap-3 transition-all shadow-2xl font-black text-xs uppercase tracking-widest w-fit">
+                  <Loader2 className={`w-5 h-5 ${processing ? 'animate-spin' : ''}`}/> {processing ? 'Processando...' : 'Sincronizar Novos Ficheiros'}
+              </button>
+            </div>
           </div>
 
           <div className="bg-legal-900 p-8 rounded-[2.5rem] shadow-xl text-white flex flex-col justify-center gap-4">
               <div className="flex items-center justify-between border-b border-legal-800 pb-3">
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Documentos</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Bibliotecados</span>
                 <span className="text-2xl font-black">{existingDB.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Total Descritores</span>
-                <span className="text-2xl font-black text-blue-400">{availableDescriptors?.length || 0}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-legal-400">Na Pasta Mãe</span>
+                <span className="text-2xl font-black text-blue-400">{filesFromFolder.length}</span>
               </div>
           </div>
       </div>

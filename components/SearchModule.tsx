@@ -67,8 +67,7 @@ const SearchModule: React.FC<{
   onUpdateAcordao: (item: Acordao) => void;
   availableDescriptors: string[];
   availableJudges: string[];
-  apiKey: string;
-}> = ({ db, onOpenPdf, onUpdateAcordao, availableDescriptors, availableJudges, apiKey }) => {
+}> = ({ db, onOpenPdf, onUpdateAcordao, availableDescriptors, availableJudges }) => {
   const [filters, setFilters] = useState<SearchFilters>({
     processo: '', relator: '', adjunto: '', descritor: '', dataInicio: '', dataFim: '', booleanAnd: '', booleanOr: '', booleanNot: ''
   });
@@ -125,18 +124,13 @@ const SearchModule: React.FC<{
   }, [db, filters, batchMode]);
 
   const runIA = async (item: Acordao, mode: 'sumario' | 'tags' | 'dados', silent = false) => {
-    if (!apiKey) {
-      if (!silent) alert("⚠️ Configure a sua Chave API no topo.");
-      return;
-    }
-    
     if (!silent) setIsProcessing({ id: item.id, mode });
 
     try {
       if (mode === 'sumario' || mode === 'tags') {
          if (!silent) onUpdateAcordao({ ...item, sumario: mode === 'sumario' ? 'A pesquisar sumário literal...' : item.sumario, descritores: mode === 'tags' ? [] : item.descritores });
          
-         const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors, apiKey);
+         const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors);
          if (result) {
             onUpdateAcordao({
                 ...item,
@@ -145,7 +139,7 @@ const SearchModule: React.FC<{
             });
          }
       } else if (mode === 'dados') {
-         const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors, apiKey);
+         const result = await extractMetadataWithAI(item.textoAnalise, availableDescriptors);
          if (result) {
             const updated = { ...item };
             if (updated.relator === 'Desconhecido' && result.relator) updated.relator = result.relator;
@@ -160,7 +154,7 @@ const SearchModule: React.FC<{
   };
 
   const startBatchProcess = async () => {
-    if (!apiKey || !batchMode) return;
+    if (!batchMode) return;
     setIsBatchRunning(true);
     setBatchProgress(0);
     const queue = [...filteredResults];
@@ -194,7 +188,6 @@ const SearchModule: React.FC<{
             <SidebarAutocomplete label="Relator" options={availableJudges} value={filters.relator} onChange={v => setFilters({...filters, relator:v})} placeholder="Filtrar por relator..." />
             <SidebarAutocomplete label="Adjunto" options={availableJudges} value={filters.adjunto} onChange={v => setFilters({...filters, adjunto:v})} placeholder="Filtrar por adjunto..." />
             
-            {/* Secção de Datas */}
             <div className="pt-2">
               <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-3 flex items-center gap-2">
                 <Calendar className="w-3 h-3"/> Período
@@ -284,10 +277,10 @@ const SearchModule: React.FC<{
                     <button onClick={() => runIA(item, 'sumario')} title="Localizar Sumário Literal com IA (Pesquisa apenas no início/fim)" className={`p-3 rounded-2xl transition-all ${isProcessing?.id === item.id && isProcessing.mode === 'sumario' ? 'bg-orange-600 text-white animate-pulse' : 'bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white'}`}>
                       {isProcessing?.id === item.id && isProcessing.mode === 'sumario' ? <Loader2 className="w-4 h-4 animate-spin"/> : <AlignLeft className="w-4 h-4"/>}
                     </button>
-                    <button onClick={() => runIA(item, 'tags')} title="Extrair Descritores do Texto" className={`p-3 rounded-2xl transition-all ${isProcessing?.id === item.id && isProcessing.mode === 'tags' ? 'bg-purple-600 text-white animate-pulse' : 'bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white'}`}>
+                    <button onClick={() => runIA(item, 'tags')} title="Extrair Descritores do Texto" className={`p-3 rounded-2xl transition-all ${isProcessing?.id === item.id && isProcessing.mode === 'tags' ? 'bg-purple-600 text-white animate-pulse' : 'bg-purple-50 text-purple-700 border-purple-100 hover:bg-purple-100'}`}>
                       {isProcessing?.id === item.id && isProcessing.mode === 'tags' ? <Loader2 className="w-4 h-4 animate-spin"/> : <Tag className="w-4 h-4"/>}
                     </button>
-                    <button onClick={() => runIA(item, 'dados')} title="Completar Magistrados e Data" className={`p-3 rounded-2xl transition-all ${isProcessing?.id === item.id && isProcessing.mode === 'dados' ? 'bg-blue-600 text-white animate-pulse' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>
+                    <button onClick={() => runIA(item, 'dados')} title="Completar Magistrados e Data" className={`p-3 rounded-2xl transition-all ${isProcessing?.id === item.id && isProcessing.mode === 'dados' ? 'bg-blue-600 text-white animate-pulse' : 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100'}`}>
                       {isProcessing?.id === item.id && isProcessing.mode === 'dados' ? <Loader2 className="w-4 h-4 animate-spin"/> : <UserCheck className="w-4 h-4"/>}
                     </button>
                     <button onClick={() => setEditingItem(item)} className="p-3 bg-gray-50 text-gray-600 rounded-2xl hover:bg-gray-200 transition-all" title="Editar Manualmente"><Pencil className="w-4 h-4"/></button>
