@@ -4,7 +4,7 @@ import ProcessingModule from './components/ProcessingModule';
 import SearchModule from './components/SearchModule';
 import ChatModule from './components/ChatModule';
 import { Acordao, ChatSession } from './types';
-import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Database, MessageSquare, Settings, FolderOpen, X, PlayCircle, UserCheck, Key, ShieldCheck, AlertTriangle, ExternalLink, Loader2 } from 'lucide-react';
+import { Scale, Save, Briefcase, Gavel, Scale as ScaleIcon, Database, MessageSquare, Settings, FolderOpen, X, PlayCircle, UserCheck, Key, ShieldCheck, AlertTriangle, ExternalLink, Loader2, CheckCircle2 } from 'lucide-react';
 
 const SOCIAL_DESCRIPTORS_LIST = [
   "Abandono do trabalho", "Acidente de trabalho", "Assédio", "Caducidade", "Categoria profissional", "Contrato de trabalho",
@@ -33,20 +33,35 @@ function App() {
   const chatInputRef = useRef<HTMLInputElement>(null);
   const directoryInputRef = useRef<HTMLInputElement>(null);
 
+  // Monitorizar a chave API de forma contínua
   useEffect(() => {
+    let interval: any;
     const checkKey = async () => {
       if (window.aistudio) {
-        const selected = await window.aistudio.hasSelectedApiKey();
-        setHasApiKey(selected);
+        try {
+          const selected = await window.aistudio.hasSelectedApiKey();
+          setHasApiKey(selected);
+        } catch (e) {
+          console.error("Erro ao verificar API Key", e);
+        }
       }
     };
+    
     checkKey();
+    interval = setInterval(checkKey, 3000); // Poll cada 3s para lidar com race conditions
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenKeySelector = async () => {
     if (window.aistudio) {
-      await window.aistudio.openSelectKey();
-      setHasApiKey(true);
+      try {
+        await window.aistudio.openSelectKey();
+        setHasApiKey(true);
+      } catch (e) {
+        alert("Não foi possível abrir o seletor de chaves. Verifique as permissões do browser.");
+      }
+    } else {
+      alert("Interface AI Studio não detetada. Recarregue a página.");
     }
   };
 
@@ -76,7 +91,6 @@ function App() {
           return adj.trim();
         });
         if (changed) {
-            // Fix: Explicitly type the filter parameter as string to resolve property access on type 'unknown'
             const uniqueAdjuntos = Array.from(new Set(newAdjuntos)).filter((a: string) => a.toLowerCase() !== newRelator.toLowerCase() && a.length > 0);
             return { ...ac, relator: newRelator, adjuntos: uniqueAdjuntos };
         }
@@ -99,33 +113,41 @@ function App() {
   const handleDirectorySelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    
     const newCache = new Map<string, File>();
     const firstPath = files[0].webkitRelativePath;
-    if (firstPath) setFolderName(firstPath.split('/')[0]);
+    if (firstPath) {
+      setFolderName(firstPath.split('/')[0]);
+    } else {
+      setFolderName("Pasta Local");
+    }
+
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
       if (f.name.toLowerCase().endsWith('.pdf')) {
-        newCache.set(f.webkitRelativePath || f.name, f);
+        // Guardamos por caminho completo E por nome para facilitar recuperação
+        if (f.webkitRelativePath) newCache.set(f.webkitRelativePath.toLowerCase(), f);
+        newCache.set(f.name.toLowerCase(), f);
       }
     }
-    setFileCache(newCache);
-    alert(`${newCache.size} ficheiros PDF carregados para visualização.`);
+    
+    setFileCache(new Map(newCache)); // Forçar nova instância para Trigger do React
+    console.log(`Cache atualizado: ${newCache.size} entradas.`);
   };
 
   const openPdf = async (filePath: string) => {
-    // Tenta encontrar pelo caminho completo ou apenas pelo nome do ficheiro (fallback para backups de outras máquinas)
-    const fileName = filePath.split('/').pop() || filePath;
-    const file = fileCache.get(filePath) || fileCache.get(fileName);
+    const pathLower = filePath.toLowerCase();
+    const fileName = (filePath.split('/').pop() || filePath).toLowerCase();
+    
+    const file = fileCache.get(pathLower) || fileCache.get(fileName);
     
     if (!file) {
-      alert(`⚠️ Ficheiro não encontrado no cache atual.\n\nPara visualizar os PDFs de uma biblioteca carregada, deve selecionar novamente a pasta original no ecrã de Configuração.`);
+      alert(`⚠️ Ficheiro "${fileName}" não encontrado.\n\nPara visualizar PDFs, deve selecionar a pasta que contém os documentos no ecrã de Configuração.`);
       return;
     }
-    const win = window.open('', '_blank');
-    if (win) {
-      const url = URL.createObjectURL(file);
-      win.location.href = url;
-    }
+    
+    const url = URL.createObjectURL(file);
+    window.open(url, '_blank');
   };
 
   const handleSaveDb = () => {
@@ -238,42 +260,44 @@ function App() {
                 <div className={`p-6 rounded-[28px] border-2 transition-all ${hasApiKey ? 'border-green-500/30 bg-green-500/5' : 'border-blue-500/30 bg-blue-500/5 animate-pulse'}`}>
                     <div className="flex items-center justify-between mb-4">
                         <Key className={`w-6 h-6 ${hasApiKey ? 'text-green-500' : 'text-blue-500'}`} />
-                        {hasApiKey && <ShieldCheck className="w-5 h-5 text-green-500" />}
+                        {hasApiKey && <CheckCircle2 className="w-5 h-5 text-green-500" />}
                     </div>
                     <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">1. Chave Gemini API</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">Necessária para Consultoria IA.</p>
-                    <button onClick={handleOpenKeySelector} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase transition-all ${hasApiKey ? 'bg-slate-700 text-slate-300' : 'bg-blue-600 text-white shadow-lg shadow-blue-900/20'}`}>
-                        {hasApiKey ? 'Chave Ativa' : 'Configurar Chave'}
+                    <p className="text-slate-400 text-[10px] mb-4">Essencial para inteligência e chat.</p>
+                    <button onClick={handleOpenKeySelector} className={`w-full py-3 rounded-xl text-[10px] font-black uppercase transition-all ${hasApiKey ? 'bg-green-600 text-white shadow-lg' : 'bg-blue-600 text-white shadow-lg'}`}>
+                        {hasApiKey ? 'Alterar Chave' : 'Ativar API Gemini'}
                     </button>
-                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="block text-center mt-3 text-[9px] font-black text-blue-400 uppercase hover:underline">Info Faturação</a>
+                    <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="block text-center mt-3 text-[9px] font-black text-blue-400 uppercase hover:underline flex items-center justify-center gap-1">Preçário API <ExternalLink className="w-2.5 h-2.5"/></a>
                 </div>
 
                 {/* Passo 2: Metadados */}
                 <div className={`p-6 rounded-[28px] border-2 transition-all ${db.length > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-slate-700 bg-slate-800/30'}`}>
                     <Database className={`w-6 h-6 mb-4 ${db.length > 0 ? 'text-green-500' : 'text-slate-400'}`} />
-                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">2. Biblioteca (JSON)</h3>
-                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos lidos.` : 'Opcional: carregar backup.'}</p>
-                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-600">Procurar JSON</button>
+                    <h3 className="text-white font-black text-[11px] uppercase tracking-widest mb-2">2. Base de Dados</h3>
+                    <p className="text-slate-400 text-[10px] mb-4">{db.length > 0 ? `${db.length} acórdãos prontos.` : 'Opcional: carregar JSON.'}</p>
+                    <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 bg-slate-700 text-white rounded-xl text-[10px] font-black uppercase hover:bg-slate-600">Carregar JSON</button>
                 </div>
 
-                {/* Passo 3: Pasta PDF (Obrigatório para abrir PDFs) */}
+                {/* Passo 3: Pasta PDF */}
                 <div className={`p-6 rounded-[28px] border-2 col-span-1 md:col-span-2 transition-all ${fileCache.size > 0 ? 'border-green-500/30 bg-green-500/5' : 'border-orange-500/30 bg-orange-500/5'}`}>
                     <div className="flex items-center gap-4 mb-4">
                         <FolderOpen className={`w-8 h-8 ${fileCache.size > 0 ? 'text-green-500' : 'text-orange-500'}`} />
                         <div className="flex-1">
-                            <h3 className="text-white font-black text-[11px] uppercase tracking-widest">3. Acesso aos PDFs Originais</h3>
-                            <p className="text-slate-400 text-[10px]">{fileCache.size > 0 ? `Ligado a: ${folderName}` : 'Indique a pasta para poder abrir os documentos PDF.'}</p>
+                            <h3 className="text-white font-black text-[11px] uppercase tracking-widest">3. Acesso aos Documentos (PDFs)</h3>
+                            <p className="text-slate-400 text-[10px]">{fileCache.size > 0 ? `Pasta conectada (${fileCache.size} ficheiros indexados).` : 'Selecione a pasta original para poder abrir os PDFs.'}</p>
                         </div>
+                        {fileCache.size > 0 && <CheckCircle2 className="w-6 h-6 text-green-500" />}
                     </div>
-                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-xl shadow-orange-900/20">Selecionar Pasta Mãe</button>
+                    <button onClick={() => directoryInputRef.current?.click()} className="w-full py-4 bg-orange-600 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-orange-500 shadow-xl">Selecionar Pasta Mãe</button>
                 </div>
             </div>
 
             <button 
                 onClick={() => setOnboardingStep('app')}
-                className="w-full bg-blue-600 text-white py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl hover:bg-blue-500 hover:scale-[1.01] transition-all active:scale-95 flex items-center justify-center gap-3"
+                disabled={!hasApiKey}
+                className={`w-full py-6 rounded-[24px] font-black text-sm uppercase tracking-[0.2em] shadow-2xl transition-all flex items-center justify-center gap-3 ${hasApiKey ? 'bg-blue-600 text-white hover:scale-[1.01] active:scale-95' : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'}`}
             >
-                <PlayCircle className="w-6 h-6" /> Entrar na JurisAnalítica
+                {hasApiKey ? <><PlayCircle className="w-6 h-6" /> Iniciar Aplicação</> : "Ative a API para continuar"}
             </button>
         </div>
       )}
