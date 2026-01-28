@@ -7,12 +7,11 @@ export interface Acordao {
   data: string;
   sumario: string;
   descritores: string[];
-  textoAnalise: string;
-  textoCompleto: string;
+  textoAnalise: string; // Primeiras e últimas páginas para IA
   fileName: string;
-  filePath: string; // Caminho relativo para distinguir ficheiros com nomes iguais em subpastas
+  filePath: string; 
   tipoDecisao: 'Acórdão' | 'Decisão Sumária';
-  // Segmentação Estrutural
+  // Segmentação Estrutural (Textos menores e limpos)
   relatorio: string;
   factosProvados: string;
   factosNaoProvados: string;
@@ -31,6 +30,13 @@ export interface SearchFilters {
   booleanNot: string;
 }
 
+// SearchResult interface added to match usage in exportService.ts
+export interface SearchResult {
+  date: string | number | Date;
+  filters: SearchFilters;
+  results: Acordao[];
+}
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
@@ -44,14 +50,6 @@ export interface ChatSession {
   title: string;
   messages: ChatMessage[];
   createdAt: number;
-}
-
-export interface SearchResult {
-  id: string;
-  name?: string;
-  filters: SearchFilters;
-  results: Acordao[];
-  date: number;
 }
 
 declare global {
